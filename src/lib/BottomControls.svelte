@@ -1,7 +1,13 @@
+<script>
+  let { running, hasParticipants, newSession, clearRoster } = $props()
+</script>
+
 <div class="controls">
-  <button class="btn btn-primary" disabled>Start all</button>
-  <button class="btn btn-secondary">New session</button>
-  <button class="btn btn-ghost-danger">Clear roster</button>
+  <button class="btn btn-primary" disabled={!hasParticipants || running}>
+    Start all
+  </button>
+  <button class="btn btn-secondary" onclick={newSession}>New session</button>
+  <button class="btn btn-ghost-danger" onclick={clearRoster}>Clear roster</button>
 </div>
 
 <style>
