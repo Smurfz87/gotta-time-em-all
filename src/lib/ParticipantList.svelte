@@ -1,8 +1,9 @@
 <script>
   import AddParticipant from './AddParticipant.svelte'
   import ParticipantCard from './ParticipantCard.svelte'
+  import HeatResultsGrid from './HeatResultsGrid.svelte'
 
-  let { participants, heatPhase, participantTimers, now, addParticipant, removeParticipant, stopParticipant } = $props()
+  let { participants, history, heatPhase, participantTimers, now, addParticipant, removeParticipant, stopParticipant } = $props()
 </script>
 
 <AddParticipant {addParticipant} />
@@ -27,6 +28,10 @@
       </li>
     {/each}
   </ul>
+{/if}
+
+{#if history.length > 0}
+  <HeatResultsGrid {history} {participants} />
 {/if}
 
 <style>
@@ -54,7 +59,7 @@
     list-style: none;
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    margin-top: 12px;
+    gap: 4px;
+    margin-top: 8px;
   }
 </style>

@@ -53,6 +53,11 @@
     session.participants.every(p => participantTimers[p.id]?.state === 'stopped')
   )
 
+  let atLeastOneStopped = $derived(
+    heatPhase !== 'idle' &&
+    session.participants.some(p => participantTimers[p.id]?.state === 'stopped')
+  )
+
   function setMode(m) {
     if (heatPhase !== 'idle') return
     if (session.history.length > 0) {
@@ -82,6 +87,20 @@
     heatPhase = 'idle'
     participantTimers = {}
     sessionTimer = { elapsed: 0, startedAt: null }
+  }
+
+  function newHeat() {
+    const results = {}
+    for (const p of session.participants) {
+      const timer = participantTimers[p.id]
+      results[p.id] = timer?.state === 'stopped' ? timer.elapsed : null
+    }
+    session.history.push({
+      id: crypto.randomUUID(),
+      number: session.history.length + 1,
+      results
+    })
+    resetHeat()
   }
 
   function startAll() {
@@ -159,6 +178,7 @@
   <main>
     <ParticipantList
       participants={session.participants}
+      history={session.history}
       {heatPhase}
       {participantTimers}
       {now}
@@ -171,9 +191,11 @@
     {heatPhase}
     hasParticipants={session.participants.length > 0}
     {allStopped}
+    {atLeastOneStopped}
     {startAll}
     {pauseAll}
     {resumeAll}
+    {newHeat}
     {newSession}
     {clearRoster}
   />
@@ -190,6 +212,6 @@
   main {
     flex: 1;
     overflow-y: auto;
-    padding: 12px;
+    padding: 8px 10px;
   }
 </style>

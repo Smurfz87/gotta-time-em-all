@@ -28,19 +28,15 @@
   let inHeat = $derived(heatPhase !== 'idle' && timer != null)
 </script>
 
-<div class="card" class:stopped={isStopped} class:in-heat={inHeat}>
+<div class="card" class:stopped={isStopped}>
   <div class="avatar" style:background={color} aria-hidden="true">
     {participant.initials}
   </div>
 
-  <div class="info">
-    <span class="name">{participant.name}</span>
-    {#if inHeat}
-      <span class="elapsed" class:ticking={isRunning}>{formatElapsed(elapsed)}</span>
-    {/if}
-  </div>
+  <span class="name">{participant.name}</span>
 
   {#if inHeat}
+    <span class="elapsed" class:ticking={isRunning}>{formatElapsed(elapsed)}</span>
     {#if isStopped}
       <span class="done-badge" aria-label="Finished">✓</span>
     {:else}
@@ -63,11 +59,11 @@
   .card {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 12px 14px;
+    gap: 10px;
+    padding: 0 10px;
     background: var(--surface);
-    border-radius: var(--radius);
-    min-height: 64px;
+    border-radius: 8px;
+    height: 44px;
     transition: background 0.2s;
   }
 
@@ -76,29 +72,22 @@
   }
 
   .avatar {
-    width: 42px;
-    height: 42px;
+    width: 30px;
+    height: 30px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 15px;
+    font-size: 12px;
     font-weight: 700;
     color: white;
     flex-shrink: 0;
     user-select: none;
   }
 
-  .info {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    overflow: hidden;
-  }
-
   .name {
-    font-size: 15px;
+    flex: 1;
+    font-size: 14px;
     font-weight: 500;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -106,11 +95,12 @@
   }
 
   .elapsed {
-    font-size: 20px;
+    font-size: 16px;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.02em;
     color: var(--text-muted);
+    flex-shrink: 0;
   }
 
   .elapsed.ticking {
@@ -118,12 +108,12 @@
   }
 
   .remove-btn {
-    width: 36px;
-    height: 36px;
+    width: 32px;
+    height: 32px;
     border-radius: 50%;
     background: transparent;
     color: var(--text-muted);
-    font-size: 22px;
+    font-size: 20px;
     line-height: 1;
     display: flex;
     align-items: center;
@@ -142,12 +132,12 @@
   }
 
   .stop-btn {
-    padding: 0 16px;
-    height: 40px;
-    border-radius: 8px;
+    padding: 0 12px;
+    height: 32px;
+    border-radius: 6px;
     background: var(--danger);
     color: white;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
     flex-shrink: 0;
     transition: opacity 0.15s;
@@ -158,12 +148,12 @@
   }
 
   .done-badge {
-    width: 36px;
-    height: 36px;
+    width: 26px;
+    height: 26px;
     border-radius: 50%;
     background: var(--running);
     color: white;
-    font-size: 16px;
+    font-size: 13px;
     font-weight: 700;
     display: flex;
     align-items: center;
