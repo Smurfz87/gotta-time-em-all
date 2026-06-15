@@ -1,5 +1,7 @@
 <script>
-  let { mode, onModeChange } = $props()
+  import { formatElapsed } from './time.js'
+
+  let { mode, onModeChange, sessionElapsed, heatPhase } = $props()
 </script>
 
 <header>
@@ -8,14 +10,18 @@
       class="toggle-btn"
       class:active={mode === 'heat'}
       onclick={() => onModeChange('heat')}
+      disabled={heatPhase !== 'idle'}
     >Heat</button>
     <button
       class="toggle-btn"
       class:active={mode === 'lap'}
       onclick={() => onModeChange('lap')}
+      disabled={heatPhase !== 'idle'}
     >Lap</button>
   </div>
-  <div class="session-clock" aria-label="Session time">00:00.00</div>
+  <div class="session-clock" class:active={heatPhase !== 'idle'} aria-label="Session time" aria-live="off">
+    {formatElapsed(sessionElapsed)}
+  </div>
 </header>
 
 <style>
@@ -54,10 +60,21 @@
     color: white;
   }
 
+  .toggle-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
   .session-clock {
     font-size: 22px;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     letter-spacing: 0.03em;
+    color: var(--text-muted);
+    transition: color 0.2s;
+  }
+
+  .session-clock.active {
+    color: var(--text);
   }
 </style>

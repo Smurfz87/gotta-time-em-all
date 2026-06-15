@@ -2,7 +2,7 @@
   import AddParticipant from './AddParticipant.svelte'
   import ParticipantCard from './ParticipantCard.svelte'
 
-  let { participants, running, addParticipant, removeParticipant } = $props()
+  let { participants, heatPhase, participantTimers, now, addParticipant, removeParticipant, stopParticipant } = $props()
 </script>
 
 <AddParticipant {addParticipant} />
@@ -18,8 +18,11 @@
       <li>
         <ParticipantCard
           participant={p}
-          {running}
+          {heatPhase}
+          timer={participantTimers[p.id] ?? null}
+          {now}
           onRemove={() => removeParticipant(p.id)}
+          onStop={() => stopParticipant(p.id)}
         />
       </li>
     {/each}

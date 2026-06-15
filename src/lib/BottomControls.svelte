@@ -1,13 +1,26 @@
 <script>
-  let { running, hasParticipants, newSession, clearRoster } = $props()
+  let { heatPhase, hasParticipants, allStopped, startAll, pauseAll, resumeAll, newSession, clearRoster } = $props()
 </script>
 
 <div class="controls">
-  <button class="btn btn-primary" disabled={!hasParticipants || running}>
-    Start all
-  </button>
-  <button class="btn btn-secondary" onclick={newSession}>New session</button>
-  <button class="btn btn-ghost-danger" onclick={clearRoster}>Clear roster</button>
+  {#if heatPhase === 'idle'}
+    <button class="btn btn-primary" disabled={!hasParticipants} onclick={startAll}>
+      Start all
+    </button>
+    <button class="btn btn-secondary" onclick={newSession}>New session</button>
+    <button class="btn btn-ghost-danger" onclick={clearRoster}>Clear roster</button>
+  {:else if heatPhase === 'running'}
+    {#if allStopped}
+      <button class="btn btn-secondary btn-full" onclick={newSession}>New session</button>
+      <button class="btn btn-ghost-danger" onclick={clearRoster}>Clear roster</button>
+    {:else}
+      <button class="btn btn-primary btn-full" onclick={pauseAll}>Pause all</button>
+    {/if}
+  {:else if heatPhase === 'paused'}
+    <button class="btn btn-primary" onclick={resumeAll}>Resume all</button>
+    <button class="btn btn-secondary" onclick={newSession}>New session</button>
+    <button class="btn btn-ghost-danger" onclick={clearRoster}>Clear roster</button>
+  {/if}
 </div>
 
 <style>
@@ -30,6 +43,10 @@
     transition: opacity 0.15s, background 0.15s;
   }
 
+  .btn-full {
+    flex: 1;
+  }
+
   .btn-primary {
     background: var(--accent);
     color: white;
@@ -37,6 +54,10 @@
 
   .btn-primary:disabled {
     opacity: 0.35;
+  }
+
+  .btn-primary:active:not(:disabled) {
+    opacity: 0.85;
   }
 
   .btn-secondary {

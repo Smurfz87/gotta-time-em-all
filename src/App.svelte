@@ -18,13 +18,43 @@
   }
 
   let session = $state(loadSession())
-  let running = $state(false)
+
+  // heatPhase: 'idle' | 'running' | 'paused'
+  let heatPhase = $state('idle')
+
+  // per-participant: { state: 'running'|'stopped', elapsed: number, startedAt: number|null }
+  let participantTimers = $state({})
+
+  // session-wide clock (independent of individual participant timers)
+  let sessionTimer = $state({ elapsed: 0, startedAt: null })
+
+  // ticks every 50ms while running to drive live display
+  let now = $state(Date.now())
+
+  $effect(() => {
+    if (heatPhase !== 'running' || allStopped) return
+    const id = setInterval(() => { now = Date.now() }, 50)
+    return () => clearInterval(id)
+  })
 
   $effect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify($state.snapshot(session)))
   })
 
+  let sessionElapsed = $derived(
+    heatPhase === 'paused' || !sessionTimer.startedAt
+      ? sessionTimer.elapsed
+      : sessionTimer.elapsed + (now - sessionTimer.startedAt)
+  )
+
+  let allStopped = $derived(
+    heatPhase !== 'idle' &&
+    session.participants.length > 0 &&
+    session.participants.every(p => participantTimers[p.id]?.state === 'stopped')
+  )
+
   function setMode(m) {
+    if (heatPhase !== 'idle') return
     if (session.history.length > 0) {
       if (!confirm(`Switch to ${m === 'heat' ? 'Heat' : 'Lap'} mode? This will reset the current session.`)) return
     }
@@ -43,33 +73,107 @@
   }
 
   function removeParticipant(id) {
+    if (heatPhase !== 'idle') return
     session.participants = session.participants.filter(p => p.id !== id)
+    delete participantTimers[id]
+  }
+
+  function resetHeat() {
+    heatPhase = 'idle'
+    participantTimers = {}
+    sessionTimer = { elapsed: 0, startedAt: null }
+  }
+
+  function startAll() {
+    const t = Date.now()
+    const timers = {}
+    for (const p of session.participants) {
+      timers[p.id] = { state: 'running', elapsed: 0, startedAt: t }
+    }
+    participantTimers = timers
+    sessionTimer = { elapsed: 0, startedAt: t }
+    heatPhase = 'running'
+    now = t
+  }
+
+  function stopParticipant(id) {
+    const timer = participantTimers[id]
+    if (!timer || timer.state !== 'running') return
+    const t = Date.now()
+    timer.elapsed += t - timer.startedAt
+    timer.startedAt = null
+    timer.state = 'stopped'
+    // freeze session clock when the last participant finishes
+    const allDone = session.participants.every(p => participantTimers[p.id]?.state === 'stopped')
+    if (allDone && sessionTimer.startedAt) {
+      sessionTimer.elapsed += t - sessionTimer.startedAt
+      sessionTimer.startedAt = null
+    }
+  }
+
+  function pauseAll() {
+    const t = Date.now()
+    for (const id in participantTimers) {
+      const timer = participantTimers[id]
+      if (timer.state === 'running' && timer.startedAt) {
+        timer.elapsed += t - timer.startedAt
+        timer.startedAt = null
+      }
+    }
+    sessionTimer.elapsed += t - sessionTimer.startedAt
+    sessionTimer.startedAt = null
+    heatPhase = 'paused'
+  }
+
+  function resumeAll() {
+    const t = Date.now()
+    for (const id in participantTimers) {
+      const timer = participantTimers[id]
+      if (timer.state === 'running') timer.startedAt = t
+    }
+    sessionTimer.startedAt = t
+    now = t
+    heatPhase = 'running'
   }
 
   function newSession() {
+    resetHeat()
     session.history = []
   }
 
   function clearRoster() {
     if (!confirm('Remove all participants and clear all history?')) return
+    resetHeat()
     session.participants = []
     session.history = []
   }
 </script>
 
 <div class="shell">
-  <TopBar mode={session.mode} onModeChange={setMode} />
+  <TopBar
+    mode={session.mode}
+    onModeChange={setMode}
+    {sessionElapsed}
+    {heatPhase}
+  />
   <main>
     <ParticipantList
       participants={session.participants}
-      {running}
+      {heatPhase}
+      {participantTimers}
+      {now}
       {addParticipant}
       {removeParticipant}
+      {stopParticipant}
     />
   </main>
   <BottomControls
-    {running}
+    {heatPhase}
     hasParticipants={session.participants.length > 0}
+    {allStopped}
+    {startAll}
+    {pauseAll}
+    {resumeAll}
     {newSession}
     {clearRoster}
   />
