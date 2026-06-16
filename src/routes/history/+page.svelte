@@ -13,6 +13,17 @@
 
   let archive = $state(loadArchive())
 
+  function deleteAll() {
+    if (!confirm('Delete all history? This cannot be undone.')) return
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY)
+      const data = raw ? JSON.parse(raw) : {}
+      data.archive = []
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+    } catch {}
+    archive = []
+  }
+
   let entries = $derived(
     [...archive].sort((a, b) => b.timestamp - a.timestamp)
   )
@@ -37,6 +48,13 @@
       </svg>
     </a>
     <h1>History</h1>
+    {#if entries.length > 0}
+      <button class="delete-all-btn" onclick={deleteAll} aria-label="Delete all history">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+        </svg>
+      </button>
+    {/if}
   </header>
 
   <main>
@@ -107,6 +125,24 @@
   .back-btn:hover {
     background: var(--surface-raised);
     color: var(--text);
+  }
+
+  .delete-all-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-muted);
+    margin-left: auto;
+    transition: background 0.15s, color 0.15s;
+  }
+
+  .delete-all-btn:hover {
+    background: color-mix(in srgb, var(--danger, #e53e3e) 12%, transparent);
+    color: var(--danger, #e53e3e);
   }
 
   h1 {

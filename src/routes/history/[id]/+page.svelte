@@ -1,5 +1,6 @@
 <script>
   import { base } from '$app/paths'
+  import { goto } from '$app/navigation'
   import { formatElapsed } from '$lib/time.js'
 
   let { data } = $props()
@@ -16,6 +17,18 @@
 
   let archive = $state(loadArchive())
   let entry = $derived(archive.find(e => e.id === data.id) ?? null)
+
+  function deleteEntry() {
+    if (!entry) return
+    if (!confirm('Delete this entry? This cannot be undone.')) return
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY)
+      const saved = raw ? JSON.parse(raw) : {}
+      saved.archive = (saved.archive ?? []).filter(e => e.id !== entry.id)
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(saved))
+    } catch {}
+    goto(`${base}/history`)
+  }
 
   // Support both new format (entry.heats[]) and old single-heat entries
   let heats = $derived(
@@ -119,6 +132,12 @@
             {/if}
           </div>
         {/each}
+      </div>
+    {/if}
+
+    {#if entry}
+      <div class="delete-row">
+        <button class="delete-btn" onclick={deleteEntry}>Delete entry</button>
       </div>
     {/if}
   </main>
@@ -272,5 +291,25 @@
     padding: 10px 14px;
     font-size: 13px;
     color: var(--text-muted);
+  }
+
+  .delete-row {
+    margin-top: 24px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .delete-btn {
+    padding: 10px 24px;
+    border-radius: var(--radius);
+    background: color-mix(in srgb, var(--danger, #e53e3e) 12%, transparent);
+    color: var(--danger, #e53e3e);
+    font-size: 14px;
+    font-weight: 600;
+    transition: background 0.15s;
+  }
+
+  .delete-btn:hover {
+    background: color-mix(in srgb, var(--danger, #e53e3e) 22%, transparent);
   }
 </style>
