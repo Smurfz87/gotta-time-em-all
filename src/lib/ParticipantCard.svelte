@@ -32,6 +32,7 @@
 
 <div class="card-wrap" class:has-laps={expanded && laps.length > 0}>
   <div class="card" class:stopped={isStopped}>
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
     <div
       class="name-area"
       class:expandable={canExpand}

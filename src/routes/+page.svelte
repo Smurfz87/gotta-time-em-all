@@ -2,36 +2,17 @@
   import TopBar from '$lib/TopBar.svelte'
   import ParticipantList from '$lib/ParticipantList.svelte'
   import BottomControls from '$lib/BottomControls.svelte'
+  import { readSession, writeSession, readSettings } from '$lib/storage.js'
+  import { getInitials } from '$lib/utils.js'
 
-  const STORAGE_KEY = 'gtta:session'
-  const SETTINGS_KEY = 'gtta:settings'
-
-  function loadSettings() {
-    try {
-      const raw = localStorage.getItem(SETTINGS_KEY)
-      return raw ? { vibrateOnLap: false, ...JSON.parse(raw) } : { vibrateOnLap: false }
-    } catch {}
-    return { vibrateOnLap: false }
-  }
-
-  const settings = loadSettings()
+  const settings = { vibrateOnLap: false, ...readSettings() }
 
   function defaultSession() {
     return { mode: 'heat', participants: [], archive: [], sessionArchiveStart: 0, lapState: null, pendingHeats: [] }
   }
 
   function loadSession() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY)
-      if (!raw) return defaultSession()
-      const saved = JSON.parse(raw)
-      return { ...defaultSession(), ...saved }
-    } catch {}
-    return defaultSession()
-  }
-
-  function getInitials(name) {
-    return name.trim().split(/\s+/).map(w => w[0].toUpperCase()).slice(0, 2).join('')
+    return { ...defaultSession(), ...readSession() }
   }
 
   let session = $state(loadSession())
@@ -58,7 +39,7 @@
   })
 
   $effect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify($state.snapshot(session)))
+    writeSession($state.snapshot(session))
   })
 
   let sessionElapsed = $derived(

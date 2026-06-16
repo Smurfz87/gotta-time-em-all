@@ -5,17 +5,10 @@
 
   let { data } = $props()
 
-  const STORAGE_KEY = 'gtta:session'
+  import { readSession, writeSession } from '$lib/storage.js'
+  import PageShell from '$lib/PageShell.svelte'
 
-  function loadArchive() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY)
-      return raw ? (JSON.parse(raw).archive ?? []) : []
-    } catch {}
-    return []
-  }
-
-  let archive = $state(loadArchive())
+  let archive = $state(readSession().archive ?? [])
   let entry = $derived(archive.find(e => e.id === data.id) ?? null)
 
   function exportCsv() {
@@ -65,12 +58,9 @@
   function deleteEntry() {
     if (!entry) return
     if (!confirm('Delete this entry? This cannot be undone.')) return
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY)
-      const saved = raw ? JSON.parse(raw) : {}
-      saved.archive = (saved.archive ?? []).filter(e => e.id !== entry.id)
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(saved))
-    } catch {}
+    const saved = readSession()
+    saved.archive = (saved.archive ?? []).filter(e => e.id !== entry.id)
+    writeSession(saved)
     goto(`${base}/history`)
   }
 
@@ -100,21 +90,11 @@
   })
 </script>
 
-<div class="page">
-  <header>
-    <a href="{base}/history" class="back-btn" aria-label="Back to history">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="15 18 9 12 15 6"/>
-      </svg>
-    </a>
-    {#if entry}
-      <h1>{entry.type === 'heat' ? 'Heat Session' : 'Run'} {entry.number}</h1>
-    {:else}
-      <h1>Entry</h1>
-    {/if}
-  </header>
-
-  <main>
+<PageShell
+  title={entry ? `${entry.type === 'heat' ? 'Heat Session' : 'Run'} ${entry.number}` : 'Entry'}
+  backHref="/history"
+  backLabel="Back to history"
+>
     {#if !entry}
       <div class="empty-state"><p>Entry not found.</p></div>
 
@@ -185,56 +165,9 @@
         <button class="delete-btn" onclick={deleteEntry}>Delete entry</button>
       </div>
     {/if}
-  </main>
-</div>
+</PageShell>
 
 <style>
-  .page {
-    display: flex;
-    flex-direction: column;
-    height: 100dvh;
-  }
-
-  header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 0 16px;
-    height: 56px;
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    flex-shrink: 0;
-  }
-
-  .back-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 36px;
-    height: 36px;
-    border-radius: 8px;
-    color: var(--text-muted);
-    transition: background 0.15s, color 0.15s;
-    flex-shrink: 0;
-  }
-
-  .back-btn:hover {
-    background: var(--surface-raised);
-    color: var(--text);
-  }
-
-  h1 {
-    font-size: 17px;
-    font-weight: 700;
-    color: var(--text);
-  }
-
-  main {
-    flex: 1;
-    overflow-y: auto;
-    padding: 16px;
-  }
-
   .empty-state {
     color: var(--text-muted);
     text-align: center;

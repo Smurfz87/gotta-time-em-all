@@ -1,38 +1,15 @@
 <script>
-  import { base } from '$app/paths'
   import QRCode from 'qrcode'
   import jsQR from 'jsqr'
+  import { readSession, writeSession, readSettings, writeSettings } from '$lib/storage.js'
+  import { getInitials } from '$lib/utils.js'
+  import PageShell from '$lib/PageShell.svelte'
 
-  const SETTINGS_KEY = 'gtta:settings'
-  const SESSION_KEY = 'gtta:session'
-
-  function loadSettings() {
-    try {
-      const raw = localStorage.getItem(SETTINGS_KEY)
-      return raw ? { vibrateOnLap: false, ...JSON.parse(raw) } : { vibrateOnLap: false }
-    } catch {}
-    return { vibrateOnLap: false }
-  }
-
-  function loadParticipants() {
-    try {
-      const raw = localStorage.getItem(SESSION_KEY)
-      return raw ? (JSON.parse(raw).participants ?? []) : []
-    } catch {}
-    return []
-  }
-
-  function getInitials(name) {
-    return name.trim().split(/\s+/).map(w => w[0].toUpperCase()).slice(0, 2).join('')
-  }
-
-  let settings = $state(loadSettings())
+  let settings = $state({ vibrateOnLap: false, ...readSettings() })
   let canVibrate = $state(false)
 
   $effect(() => { canVibrate = typeof navigator.vibrate === 'function' })
-  $effect(() => {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify($state.snapshot(settings)))
-  })
+  $effect(() => { writeSettings($state.snapshot(settings)) })
 
   // --- QR Share ---
   let showQrModal = $state(false)
@@ -40,7 +17,7 @@
   let qrNames = $state([])
 
   async function openQrModal() {
-    const participants = loadParticipants()
+    const participants = readSession().participants ?? []
     if (participants.length === 0) {
       alert('Add participants on the timer screen first.')
       return
@@ -121,7 +98,7 @@
       alert('No participants found in QR code.')
       return
     }
-    const existing = loadParticipants()
+    const existing = readSession().participants ?? []
     let replace = true
     if (existing.length > 0) {
       replace = confirm(
@@ -134,12 +111,11 @@
       initials: getInitials(name)
     }))
     try {
-      const sessionRaw = localStorage.getItem(SESSION_KEY)
-      const session = sessionRaw ? JSON.parse(sessionRaw) : {}
+      const session = readSession()
       session.participants = replace
         ? incoming
         : [...(session.participants ?? []), ...incoming]
-      localStorage.setItem(SESSION_KEY, JSON.stringify(session))
+      writeSession(session)
       alert(`Imported ${incoming.length} participant(s). Go back to the timer to see them.`)
     } catch {
       alert('Failed to save participants.')
@@ -147,17 +123,8 @@
   }
 </script>
 
-<div class="page">
-  <header>
-    <a href="{base}/" class="back-btn" aria-label="Back to timer">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="15 18 9 12 15 6"/>
-      </svg>
-    </a>
-    <h1>Settings</h1>
-  </header>
-
-  <main>
+<PageShell title="Settings" backLabel="Back to timer">
+  <div class="sections">
     <div class="section">
       <div class="section-title">Roster</div>
       <button class="setting-row btn-row" onclick={openQrModal}>
@@ -198,13 +165,22 @@
         </label>
       </div>
     {/if}
-  </main>
-</div>
+  </div>
+</PageShell>
 
 <!-- QR display modal -->
 {#if showQrModal}
-  <div class="modal-backdrop" onclick={() => showQrModal = false} role="dialog" aria-modal="true" aria-label="Share roster">
-    <div class="modal" onclick={(e) => e.stopPropagation()}>
+  <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+  <div
+    class="modal-backdrop"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Share roster"
+    tabindex="-1"
+    onclick={(e) => { if (e.target === e.currentTarget) showQrModal = false }}
+    onkeydown={(e) => { if (e.key === 'Escape') showQrModal = false }}
+  >
+    <div class="modal">
       <div class="modal-header">
         <h2>Share Roster</h2>
         <button class="modal-close" onclick={() => showQrModal = false} aria-label="Close">
@@ -224,7 +200,15 @@
 
 <!-- Scan modal -->
 {#if showScanModal}
-  <div class="modal-backdrop" role="dialog" aria-modal="true" aria-label="Scan roster">
+  <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+  <div
+    class="modal-backdrop"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Scan roster"
+    tabindex="-1"
+    onkeydown={(e) => { if (e.key === 'Escape') closeScanModal() }}
+  >
     <div class="modal">
       <div class="modal-header">
         <h2>Scan Roster</h2>
@@ -248,49 +232,7 @@
 {/if}
 
 <style>
-  .page {
-    display: flex;
-    flex-direction: column;
-    height: 100dvh;
-  }
-
-  header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 0 16px;
-    height: 56px;
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    flex-shrink: 0;
-  }
-
-  .back-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 36px;
-    height: 36px;
-    border-radius: 8px;
-    color: var(--text-muted);
-    transition: background 0.15s, color 0.15s;
-  }
-
-  .back-btn:hover {
-    background: var(--surface-raised);
-    color: var(--text);
-  }
-
-  h1 {
-    font-size: 17px;
-    font-weight: 700;
-    color: var(--text);
-  }
-
-  main {
-    flex: 1;
-    padding: 16px;
-    overflow-y: auto;
+  .sections {
     display: flex;
     flex-direction: column;
     gap: 12px;

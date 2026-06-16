@@ -1,25 +1,14 @@
 <script>
   import { base } from '$app/paths'
+  import { readSession, writeSession } from '$lib/storage.js'
+  import PageShell from '$lib/PageShell.svelte'
 
-  const STORAGE_KEY = 'gtta:session'
-
-  function loadArchive() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY)
-      return raw ? (JSON.parse(raw).archive ?? []) : []
-    } catch {}
-    return []
-  }
-
-  let archive = $state(loadArchive())
+  let archive = $state(readSession().archive ?? [])
 
   function saveArchive(newArchive) {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY)
-      const data = raw ? JSON.parse(raw) : {}
-      data.archive = newArchive
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-    } catch {}
+    const data = readSession()
+    data.archive = newArchive
+    writeSession(data)
     archive = newArchive
   }
 
@@ -93,14 +82,8 @@
   }
 </script>
 
-<div class="page">
-  <header>
-    <a href="{base}/" class="back-btn" aria-label="Back to timer">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="15 18 9 12 15 6"/>
-      </svg>
-    </a>
-    <h1>History</h1>
+<PageShell title="History" backLabel="Back to timer">
+  {#snippet actions()}
     <div class="header-actions">
       <button class="hdr-btn" onclick={importArchive} aria-label="Import archive">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -125,78 +108,42 @@
       {/if}
     </div>
     <input bind:this={fileInput} type="file" accept=".json,application/json" onchange={onFileSelected} style="display:none" />
-  </header>
+  {/snippet}
 
-  <main>
-    {#if entries.length === 0}
-      <div class="empty-state">
-        <span class="icon" aria-hidden="true">📋</span>
-        <p>No recorded sessions yet.</p>
-      </div>
-    {:else}
-      <ul class="entry-list">
-        {#each entries as entry (entry.id)}
-          <li>
-            <a href="{base}/history/{entry.id}" class="entry-row">
-              <div class="entry-info">
-                <span class="entry-num">
-                  {entry.type === 'heat' ? 'Heat Session' : 'Run'} {entry.number}
-                </span>
-                {#if entry.type === 'heat'}
-                  {@const n = heatCount(entry)}
-                  <span class="entry-sub">{n} heat{n !== 1 ? 's' : ''}</span>
-                {/if}
-              </div>
-              <span class="entry-time">{formatDateTime(entry.timestamp)}</span>
-              <span class="entry-badge" class:heat={entry.type === 'heat'} class:run={entry.type === 'run'}>
-                {entry.type === 'heat' ? 'Heat' : 'Run'}
+  {#if entries.length === 0}
+    <div class="empty-state">
+      <span class="icon" aria-hidden="true">📋</span>
+      <p>No recorded sessions yet.</p>
+    </div>
+  {:else}
+    <ul class="entry-list">
+      {#each entries as entry (entry.id)}
+        <li>
+          <a href="{base}/history/{entry.id}" class="entry-row">
+            <div class="entry-info">
+              <span class="entry-num">
+                {entry.type === 'heat' ? 'Heat Session' : 'Run'} {entry.number}
               </span>
-              <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="9 18 15 12 9 6"/>
-              </svg>
-            </a>
-          </li>
-        {/each}
-      </ul>
-    {/if}
-  </main>
-</div>
+              {#if entry.type === 'heat'}
+                {@const n = heatCount(entry)}
+                <span class="entry-sub">{n} heat{n !== 1 ? 's' : ''}</span>
+              {/if}
+            </div>
+            <span class="entry-time">{formatDateTime(entry.timestamp)}</span>
+            <span class="entry-badge" class:heat={entry.type === 'heat'} class:run={entry.type === 'run'}>
+              {entry.type === 'heat' ? 'Heat' : 'Run'}
+            </span>
+            <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="9 18 15 12 9 6"/>
+            </svg>
+          </a>
+        </li>
+      {/each}
+    </ul>
+  {/if}
+</PageShell>
 
 <style>
-  .page {
-    display: flex;
-    flex-direction: column;
-    height: 100dvh;
-  }
-
-  header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 0 16px;
-    height: 56px;
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    flex-shrink: 0;
-  }
-
-  .back-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 36px;
-    height: 36px;
-    border-radius: 8px;
-    color: var(--text-muted);
-    transition: background 0.15s, color 0.15s;
-    flex-shrink: 0;
-  }
-
-  .back-btn:hover {
-    background: var(--surface-raised);
-    color: var(--text);
-  }
-
   .header-actions {
     display: flex;
     gap: 2px;
@@ -223,18 +170,6 @@
   .hdr-btn--danger:hover {
     background: color-mix(in srgb, var(--danger, #e53e3e) 12%, transparent);
     color: var(--danger, #e53e3e);
-  }
-
-  h1 {
-    font-size: 17px;
-    font-weight: 700;
-    color: var(--text);
-  }
-
-  main {
-    flex: 1;
-    overflow-y: auto;
-    padding: 16px;
   }
 
   .empty-state {
