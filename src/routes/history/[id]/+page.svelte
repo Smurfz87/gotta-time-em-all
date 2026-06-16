@@ -18,6 +18,50 @@
   let archive = $state(loadArchive())
   let entry = $derived(archive.find(e => e.id === data.id) ?? null)
 
+  function exportCsv() {
+    if (!entry) return
+    const date = new Date(entry.timestamp).toISOString().slice(0, 10)
+    const filename = `${entry.type}-${date}.csv`
+    let csv = ''
+
+    if (entry.type === 'heat') {
+      const sorted = heatResults()
+      const heatList = heats
+      const header = ['Participant', ...heatList.map(h => `Heat ${h.number}`), 'Best'].join(',')
+      const rows = sorted.map(p => {
+        const times = heatList.map(h => {
+          const t = h.results[p.id]
+          return t != null ? formatElapsed(t) : 'DNF'
+        })
+        const best = heatList.reduce((m, h) => {
+          const t = h.results[p.id]
+          return t != null && (m == null || t < m) ? t : m
+        }, null)
+        return [p.name, ...times, best != null ? formatElapsed(best) : 'DNF'].join(',')
+      })
+      csv = [header, ...rows].join('\n')
+    } else {
+      const lines = ['Participant,Lap,Gap,Cumulative']
+      for (const p of entry.participants) {
+        const result = entry.results[p.id]
+        if (!result) continue
+        for (const lap of result.laps) {
+          lines.push(`${p.name},${lap.number},${formatElapsed(lap.gap)},${formatElapsed(lap.cumulative)}`)
+        }
+        lines.push(`${p.name},Total,,${formatElapsed(result.elapsed)}`)
+      }
+      csv = lines.join('\n')
+    }
+
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   function deleteEntry() {
     if (!entry) return
     if (!confirm('Delete this entry? This cannot be undone.')) return
@@ -136,7 +180,8 @@
     {/if}
 
     {#if entry}
-      <div class="delete-row">
+      <div class="action-row">
+        <button class="export-btn" onclick={exportCsv}>Export CSV</button>
         <button class="delete-btn" onclick={deleteEntry}>Delete entry</button>
       </div>
     {/if}
@@ -293,20 +338,33 @@
     color: var(--text-muted);
   }
 
-  .delete-row {
+  .action-row {
     margin-top: 24px;
     display: flex;
     justify-content: center;
+    gap: 10px;
   }
 
-  .delete-btn {
+  .export-btn, .delete-btn {
     padding: 10px 24px;
     border-radius: var(--radius);
-    background: color-mix(in srgb, var(--danger, #e53e3e) 12%, transparent);
-    color: var(--danger, #e53e3e);
     font-size: 14px;
     font-weight: 600;
     transition: background 0.15s;
+  }
+
+  .export-btn {
+    background: var(--surface);
+    color: var(--text);
+  }
+
+  .export-btn:hover {
+    background: var(--surface-raised);
+  }
+
+  .delete-btn {
+    background: color-mix(in srgb, var(--danger, #e53e3e) 12%, transparent);
+    color: var(--danger, #e53e3e);
   }
 
   .delete-btn:hover {
