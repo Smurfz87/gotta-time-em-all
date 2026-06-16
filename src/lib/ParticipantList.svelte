@@ -3,7 +3,7 @@
   import ParticipantCard from './ParticipantCard.svelte'
   import HeatResultsGrid from './HeatResultsGrid.svelte'
 
-  let { participants, history, mode, heatPhase, participantTimers, now, addParticipant, removeParticipant, stopParticipant, recordLap } = $props()
+  let { participants, history, mode, heatPhase, participantTimers, now, addParticipant, removeParticipant, stopParticipant, recordLap, vibrateOnLap } = $props()
 
   let expandedIds = $state({})
   let flashKeys = $state({})
@@ -30,6 +30,7 @@
   function handleLap(id) {
     recordLap(id)
     flashKeys[id] = (flashKeys[id] ?? 0) + 1
+    if (vibrateOnLap) try { navigator.vibrate(50) } catch {}
   }
 
   let anyHasLaps = $derived(

@@ -4,6 +4,17 @@
   import BottomControls from '$lib/BottomControls.svelte'
 
   const STORAGE_KEY = 'gtta:session'
+  const SETTINGS_KEY = 'gtta:settings'
+
+  function loadSettings() {
+    try {
+      const raw = localStorage.getItem(SETTINGS_KEY)
+      return raw ? { vibrateOnLap: false, ...JSON.parse(raw) } : { vibrateOnLap: false }
+    } catch {}
+    return { vibrateOnLap: false }
+  }
+
+  const settings = loadSettings()
 
   function defaultSession() {
     return { mode: 'heat', participants: [], archive: [], sessionArchiveStart: 0, lapState: null }
@@ -282,6 +293,7 @@
       {removeParticipant}
       {stopParticipant}
       {recordLap}
+      vibrateOnLap={settings.vibrateOnLap}
     />
   </main>
   <BottomControls
