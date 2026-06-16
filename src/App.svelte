@@ -5,12 +5,18 @@
 
   const STORAGE_KEY = 'gtta:session'
 
+  function defaultSession() {
+    return { mode: 'heat', participants: [], history: [], lapState: null }
+  }
+
   function loadSession() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY)
-      if (raw) return JSON.parse(raw)
+      if (!raw) return defaultSession()
+      const saved = JSON.parse(raw)
+      return { ...defaultSession(), ...saved }
     } catch {}
-    return { mode: 'heat', participants: [], history: [] }
+    return defaultSession()
   }
 
   function getInitials(name) {
@@ -18,18 +24,21 @@
   }
 
   let session = $state(loadSession())
-
-  // heatPhase: 'idle' | 'running' | 'paused'
   let heatPhase = $state('idle')
-
-  // per-participant: { state: 'running'|'stopped', elapsed: number, startedAt: number|null }
   let participantTimers = $state({})
-
-  // session-wide clock (independent of individual participant timers)
   let sessionTimer = $state({ elapsed: 0, startedAt: null })
-
-  // ticks every 50ms while running to drive live display
   let now = $state(Date.now())
+
+  // Restore lap session on page reload — startedAt timestamps are wall-clock epoch
+  // values so elapsed time continues accumulating correctly without any adjustment
+  if (session.lapState?.phase && session.lapState.phase !== 'idle') {
+    heatPhase = session.lapState.phase
+    participantTimers = session.lapState.participants ?? {}
+    sessionTimer = {
+      elapsed: session.lapState.sessionElapsed ?? 0,
+      startedAt: session.lapState.sessionStartedAt ?? null
+    }
+  }
 
   $effect(() => {
     if (heatPhase !== 'running' || allStopped) return
@@ -60,11 +69,12 @@
 
   function setMode(m) {
     if (heatPhase !== 'idle') return
-    if (session.history.length > 0) {
+    if (session.history.length > 0 || session.lapState) {
       if (!confirm(`Switch to ${m === 'heat' ? 'Heat' : 'Lap'} mode? This will reset the current session.`)) return
     }
     session.mode = m
     session.history = []
+    session.lapState = null
   }
 
   function addParticipant(name) {
@@ -87,6 +97,91 @@
     heatPhase = 'idle'
     participantTimers = {}
     sessionTimer = { elapsed: 0, startedAt: null }
+    if (session.mode === 'lap') session.lapState = null
+  }
+
+  function startAll() {
+    const t = Date.now()
+    if (session.mode === 'lap') {
+      const participants = {}
+      for (const p of session.participants) {
+        participants[p.id] = { state: 'running', elapsed: 0, startedAt: t, laps: [] }
+      }
+      session.lapState = { phase: 'running', sessionElapsed: 0, sessionStartedAt: t, participants }
+      participantTimers = session.lapState.participants
+    } else {
+      const timers = {}
+      for (const p of session.participants) {
+        timers[p.id] = { state: 'running', elapsed: 0, startedAt: t }
+      }
+      participantTimers = timers
+    }
+    sessionTimer = { elapsed: 0, startedAt: t }
+    heatPhase = 'running'
+    now = t
+  }
+
+  function stopParticipant(id) {
+    const timer = participantTimers[id]
+    if (!timer || timer.state !== 'running') return
+    const t = Date.now()
+    timer.elapsed += t - timer.startedAt
+    timer.startedAt = null
+    timer.state = 'stopped'
+    // freeze session clock when everyone is done
+    const allDone = session.participants.every(p => participantTimers[p.id]?.state === 'stopped')
+    if (allDone && sessionTimer.startedAt) {
+      sessionTimer.elapsed += t - sessionTimer.startedAt
+      sessionTimer.startedAt = null
+      if (session.mode === 'lap' && session.lapState) {
+        session.lapState.sessionElapsed = sessionTimer.elapsed
+        session.lapState.sessionStartedAt = null
+      }
+    }
+  }
+
+  function recordLap(id) {
+    const timer = participantTimers[id]
+    if (!timer || timer.state !== 'running' || heatPhase !== 'running') return
+    const t = Date.now()
+    const cumulative = timer.elapsed + (t - timer.startedAt)
+    const prev = timer.laps[timer.laps.length - 1]
+    const gap = prev ? cumulative - prev.cumulative : cumulative
+    timer.laps.push({ number: timer.laps.length + 1, cumulative, gap })
+  }
+
+  function pauseAll() {
+    const t = Date.now()
+    for (const id in participantTimers) {
+      const timer = participantTimers[id]
+      if (timer.state === 'running' && timer.startedAt) {
+        timer.elapsed += t - timer.startedAt
+        timer.startedAt = null
+      }
+    }
+    sessionTimer.elapsed += t - sessionTimer.startedAt
+    sessionTimer.startedAt = null
+    if (session.mode === 'lap' && session.lapState) {
+      session.lapState.phase = 'paused'
+      session.lapState.sessionElapsed = sessionTimer.elapsed
+      session.lapState.sessionStartedAt = null
+    }
+    heatPhase = 'paused'
+  }
+
+  function resumeAll() {
+    const t = Date.now()
+    for (const id in participantTimers) {
+      const timer = participantTimers[id]
+      if (timer.state === 'running') timer.startedAt = t
+    }
+    sessionTimer.startedAt = t
+    if (session.mode === 'lap' && session.lapState) {
+      session.lapState.phase = 'running'
+      session.lapState.sessionStartedAt = t
+    }
+    now = t
+    heatPhase = 'running'
   }
 
   function newHeat() {
@@ -101,58 +196,6 @@
       results
     })
     resetHeat()
-  }
-
-  function startAll() {
-    const t = Date.now()
-    const timers = {}
-    for (const p of session.participants) {
-      timers[p.id] = { state: 'running', elapsed: 0, startedAt: t }
-    }
-    participantTimers = timers
-    sessionTimer = { elapsed: 0, startedAt: t }
-    heatPhase = 'running'
-    now = t
-  }
-
-  function stopParticipant(id) {
-    const timer = participantTimers[id]
-    if (!timer || timer.state !== 'running') return
-    const t = Date.now()
-    timer.elapsed += t - timer.startedAt
-    timer.startedAt = null
-    timer.state = 'stopped'
-    // freeze session clock when the last participant finishes
-    const allDone = session.participants.every(p => participantTimers[p.id]?.state === 'stopped')
-    if (allDone && sessionTimer.startedAt) {
-      sessionTimer.elapsed += t - sessionTimer.startedAt
-      sessionTimer.startedAt = null
-    }
-  }
-
-  function pauseAll() {
-    const t = Date.now()
-    for (const id in participantTimers) {
-      const timer = participantTimers[id]
-      if (timer.state === 'running' && timer.startedAt) {
-        timer.elapsed += t - timer.startedAt
-        timer.startedAt = null
-      }
-    }
-    sessionTimer.elapsed += t - sessionTimer.startedAt
-    sessionTimer.startedAt = null
-    heatPhase = 'paused'
-  }
-
-  function resumeAll() {
-    const t = Date.now()
-    for (const id in participantTimers) {
-      const timer = participantTimers[id]
-      if (timer.state === 'running') timer.startedAt = t
-    }
-    sessionTimer.startedAt = t
-    now = t
-    heatPhase = 'running'
   }
 
   function newSession() {
@@ -179,15 +222,18 @@
     <ParticipantList
       participants={session.participants}
       history={session.history}
+      mode={session.mode}
       {heatPhase}
       {participantTimers}
       {now}
       {addParticipant}
       {removeParticipant}
       {stopParticipant}
+      {recordLap}
     />
   </main>
   <BottomControls
+    mode={session.mode}
     {heatPhase}
     hasParticipants={session.participants.length > 0}
     {allStopped}

@@ -3,7 +3,7 @@
   import ParticipantCard from './ParticipantCard.svelte'
   import HeatResultsGrid from './HeatResultsGrid.svelte'
 
-  let { participants, history, heatPhase, participantTimers, now, addParticipant, removeParticipant, stopParticipant } = $props()
+  let { participants, history, mode, heatPhase, participantTimers, now, addParticipant, removeParticipant, stopParticipant, recordLap } = $props()
 </script>
 
 <AddParticipant {addParticipant} />
@@ -19,18 +19,20 @@
       <li>
         <ParticipantCard
           participant={p}
+          {mode}
           {heatPhase}
           timer={participantTimers[p.id] ?? null}
           {now}
           onRemove={() => removeParticipant(p.id)}
           onStop={() => stopParticipant(p.id)}
+          onLap={() => recordLap(p.id)}
         />
       </li>
     {/each}
   </ul>
 {/if}
 
-{#if history.length > 0}
+{#if mode === 'heat' && history.length > 0}
   <HeatResultsGrid {history} {participants} />
 {/if}
 

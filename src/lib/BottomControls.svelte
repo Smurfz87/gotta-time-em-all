@@ -1,6 +1,6 @@
 <script>
   let {
-    heatPhase, hasParticipants, allStopped, atLeastOneStopped,
+    mode, heatPhase, hasParticipants, allStopped, atLeastOneStopped,
     startAll, pauseAll, resumeAll, newHeat, newSession, clearRoster
   } = $props()
 </script>
@@ -15,10 +15,12 @@
 
   {:else if heatPhase === 'running'}
     {#if allStopped}
-      <button class="btn btn-primary" onclick={newHeat}>New Heat</button>
+      {#if mode === 'heat'}
+        <button class="btn btn-primary" onclick={newHeat}>New Heat</button>
+      {/if}
       <button class="btn btn-secondary" onclick={newSession}>New session</button>
       <button class="btn btn-ghost-danger" onclick={clearRoster}>Clear roster</button>
-    {:else if atLeastOneStopped}
+    {:else if atLeastOneStopped && mode === 'heat'}
       <button class="btn btn-secondary" onclick={pauseAll}>Pause all</button>
       <button class="btn btn-primary" onclick={newHeat}>New Heat</button>
     {:else}
@@ -27,7 +29,7 @@
 
   {:else if heatPhase === 'paused'}
     <button class="btn btn-primary" onclick={resumeAll}>Resume all</button>
-    {#if atLeastOneStopped}
+    {#if atLeastOneStopped && mode === 'heat'}
       <button class="btn btn-secondary" onclick={newHeat}>New Heat</button>
     {:else}
       <button class="btn btn-secondary" onclick={newSession}>New session</button>
