@@ -9,8 +9,16 @@ A person whose time is being recorded in a session. Can be added at any time, in
 _Avoid_: Athlete, player, user, person
 
 **Session**:
-A full practice — contains participants, a mode (Heat or Lap), and a history of all heats or laps recorded. Persists in localStorage; one active session at a time. Mode is fixed for the lifetime of the session. "New session" clears history but keeps participants. "Clear roster" removes all participants and history. Data model is structured to support a session archive in v2, but v1 only stores the current session.
+The current in-progress timing activity. Has a mode (Heat or Lap), a participant roster, and an active timer state. Mode is fixed for the lifetime of the session. "New session" resets the timer state and commits any in-progress results to the Archive, but keeps the participant roster. "Clear roster" removes all participants and clears the Archive. Mode switching also commits the in-progress state to the Archive before resetting.
 _Avoid_: Event, workout, round
+
+**Archive**:
+The persistent cross-session list of all committed results. Each entry is either a Heat or a Run, tagged with a timestamp. Survives mode switches and new sessions. Displayed on the History page as a numbered list ordered by time. Entries can be deleted individually or all at once.
+_Avoid_: History (as a variable name — conflicts with browser History API), log, record list
+
+**Run**:
+A committed Lap-mode result — one continuous Lap-mode session, containing all participants and their full set of lap splits. The Lap-mode counterpart to a Heat.
+_Avoid_: Lap session, lap run, session result
 
 **Heat mode**:
 A timing mode where all participants start simultaneously and each stops individually when they finish. Produces one elapsed time per participant per heat. Results are displayed as a cross-participant grid (rows = heats, columns = participants), horizontally scrollable on mobile.
