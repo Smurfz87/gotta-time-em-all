@@ -13,15 +13,68 @@
 
   let archive = $state(loadArchive())
 
-  function deleteAll() {
-    if (!confirm('Delete all history? This cannot be undone.')) return
+  function saveArchive(newArchive) {
     try {
       const raw = localStorage.getItem(STORAGE_KEY)
       const data = raw ? JSON.parse(raw) : {}
-      data.archive = []
+      data.archive = newArchive
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
     } catch {}
-    archive = []
+    archive = newArchive
+  }
+
+  function deleteAll() {
+    if (!confirm('Delete all history? This cannot be undone.')) return
+    saveArchive([])
+  }
+
+  function exportArchive() {
+    const payload = JSON.stringify({ version: 1, exportedAt: Date.now(), archive }, null, 2)
+    const blob = new Blob([payload], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const date = new Date().toISOString().slice(0, 10)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `gtta-archive-${date}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  let fileInput = $state(null)
+
+  function importArchive() {
+    fileInput.click()
+  }
+
+  async function onFileSelected(e) {
+    const file = e.target.files[0]
+    if (!file) return
+    e.target.value = ''
+    let parsed
+    try {
+      parsed = JSON.parse(await file.text())
+    } catch {
+      alert('Invalid file — could not parse JSON.')
+      return
+    }
+    if (!Array.isArray(parsed?.archive)) {
+      alert('Invalid file — missing archive data.')
+      return
+    }
+    const incoming = parsed.archive
+    if (archive.length > 0) {
+      const replace = confirm(
+        `Import ${incoming.length} entr${incoming.length !== 1 ? 'ies' : 'y'}?\n\nOK → Replace existing\nCancel → Merge with existing`
+      )
+      if (replace) {
+        saveArchive(incoming)
+      } else {
+        const merged = new Map([...archive, ...incoming].map(e => [e.id, e]))
+        saveArchive([...merged.values()])
+      }
+    } else {
+      saveArchive(incoming)
+    }
   }
 
   let entries = $derived(
@@ -48,13 +101,30 @@
       </svg>
     </a>
     <h1>History</h1>
-    {#if entries.length > 0}
-      <button class="delete-all-btn" onclick={deleteAll} aria-label="Delete all history">
+    <div class="header-actions">
+      <button class="hdr-btn" onclick={importArchive} aria-label="Import archive">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
         </svg>
       </button>
-    {/if}
+      {#if entries.length > 0}
+        <button class="hdr-btn" onclick={exportArchive} aria-label="Export archive">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+        </button>
+        <button class="hdr-btn hdr-btn--danger" onclick={deleteAll} aria-label="Delete all history">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+          </svg>
+        </button>
+      {/if}
+    </div>
+    <input bind:this={fileInput} type="file" accept=".json,application/json" onchange={onFileSelected} style="display:none" />
   </header>
 
   <main>
@@ -127,7 +197,13 @@
     color: var(--text);
   }
 
-  .delete-all-btn {
+  .header-actions {
+    display: flex;
+    gap: 2px;
+    margin-left: auto;
+  }
+
+  .hdr-btn {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -136,11 +212,15 @@
     border-radius: 8px;
     background: transparent;
     color: var(--text-muted);
-    margin-left: auto;
     transition: background 0.15s, color 0.15s;
   }
 
-  .delete-all-btn:hover {
+  .hdr-btn:hover {
+    background: var(--surface-raised);
+    color: var(--text);
+  }
+
+  .hdr-btn--danger:hover {
     background: color-mix(in srgb, var(--danger, #e53e3e) 12%, transparent);
     color: var(--danger, #e53e3e);
   }
