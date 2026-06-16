@@ -1,7 +1,7 @@
 <script>
-  import TopBar from './lib/TopBar.svelte'
-  import ParticipantList from './lib/ParticipantList.svelte'
-  import BottomControls from './lib/BottomControls.svelte'
+  import TopBar from '$lib/TopBar.svelte'
+  import ParticipantList from '$lib/ParticipantList.svelte'
+  import BottomControls from '$lib/BottomControls.svelte'
 
   const STORAGE_KEY = 'gtta:session'
 

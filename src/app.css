@@ -20,7 +20,7 @@
   --font: system-ui, -apple-system, sans-serif;
 }
 
-html, body, #app {
+html, body {
   height: 100%;
 }
 
