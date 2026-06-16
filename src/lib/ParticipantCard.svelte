@@ -1,7 +1,7 @@
 <script>
   import { formatElapsed } from './time.js'
 
-  let { participant, mode, heatPhase, timer, now, onRemove, onStop, onLap } = $props()
+  let { participant, mode, heatPhase, timer, now, expanded, flashKey, onToggleExpand, onRemove, onStop, onLap } = $props()
 
   const AVATAR_COLORS = [
     '#3b82f6', '#8b5cf6', '#ec4899', '#10b981',
@@ -27,18 +27,31 @@
   let isRunning = $derived(timer?.state === 'running' && heatPhase === 'running')
   let inSession = $derived(heatPhase !== 'idle' && timer != null)
   let laps = $derived(timer?.laps ?? [])
+  let canExpand = $derived(mode === 'lap' && laps.length > 0)
 </script>
 
-<div class="card-wrap" class:has-laps={laps.length > 0}>
+<div class="card-wrap" class:has-laps={expanded && laps.length > 0}>
   <div class="card" class:stopped={isStopped}>
-    <div class="avatar" style:background={color} aria-hidden="true">
-      {participant.initials}
+    <div
+      class="name-area"
+      class:expandable={canExpand}
+      onclick={canExpand ? onToggleExpand : null}
+      role={canExpand ? 'button' : null}
+      aria-expanded={canExpand ? expanded : null}
+      tabindex={canExpand ? 0 : null}
+      onkeydown={canExpand ? (e) => (e.key === 'Enter' || e.key === ' ') && onToggleExpand() : null}
+    >
+      <div class="avatar" style:background={color} aria-hidden="true">
+        {participant.initials}
+      </div>
+      <span class="name">{participant.name}</span>
     </div>
-
-    <span class="name">{participant.name}</span>
 
     {#if inSession}
       <span class="elapsed" class:ticking={isRunning}>{formatElapsed(elapsed)}</span>
+      {#if laps.length > 0}
+        <span class="lap-count">×{laps.length}</span>
+      {/if}
       {#if isStopped}
         <span class="done-badge" aria-label="Finished">✓</span>
       {:else if mode === 'lap'}
@@ -56,9 +69,15 @@
         title={heatPhase !== 'idle' ? 'Cannot remove during a session' : 'Remove participant'}
       >×</button>
     {/if}
+
+    {#key flashKey}
+      {#if flashKey > 0}
+        <div class="flash-overlay" aria-hidden="true"></div>
+      {/if}
+    {/key}
   </div>
 
-  {#if laps.length > 0}
+  {#if expanded && laps.length > 0}
     <div class="laps">
       <table>
         <thead>
@@ -90,16 +109,31 @@
   }
 
   .card {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 10px;
     padding: 0 10px;
     height: 44px;
     transition: background 0.2s;
+    overflow: hidden;
   }
 
   .card.stopped {
     background: color-mix(in srgb, var(--surface) 80%, var(--running) 20%);
+  }
+
+  .name-area {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+  }
+
+  .name-area.expandable {
+    cursor: pointer;
   }
 
   .avatar {
@@ -139,6 +173,15 @@
     color: var(--text);
   }
 
+  .lap-count {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent);
+    flex-shrink: 0;
+    min-width: 20px;
+    text-align: right;
+  }
+
   .remove-btn {
     width: 32px;
     height: 32px;
@@ -162,7 +205,6 @@
     opacity: 0.25;
   }
 
-  /* Heat mode stop */
   .stop-btn {
     padding: 0 12px;
     height: 32px;
@@ -174,7 +216,6 @@
     flex-shrink: 0;
   }
 
-  /* Lap mode buttons */
   .lap-btn {
     padding: 0 12px;
     height: 32px;
@@ -222,6 +263,20 @@
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+  }
+
+  /* Flash animation — element recreated on each lap via {#key}, restarting the animation */
+  .flash-overlay {
+    position: absolute;
+    inset: 0;
+    background: color-mix(in srgb, var(--accent) 35%, transparent);
+    animation: lap-flash 0.5s ease-out forwards;
+    pointer-events: none;
+  }
+
+  @keyframes lap-flash {
+    from { opacity: 1; }
+    to   { opacity: 0; }
   }
 
   /* Lap history table */

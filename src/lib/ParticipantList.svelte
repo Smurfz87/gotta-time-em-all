@@ -4,9 +4,47 @@
   import HeatResultsGrid from './HeatResultsGrid.svelte'
 
   let { participants, history, mode, heatPhase, participantTimers, now, addParticipant, removeParticipant, stopParticipant, recordLap } = $props()
+
+  let expandedIds = $state({})
+  let flashKeys = $state({})
+
+  $effect(() => {
+    if (heatPhase === 'idle') {
+      expandedIds = {}
+      flashKeys = {}
+    }
+  })
+
+  function toggleExpand(id) {
+    expandedIds[id] = !expandedIds[id]
+  }
+
+  function expandAll() {
+    for (const p of participants) expandedIds[p.id] = true
+  }
+
+  function collapseAll() {
+    for (const p of participants) expandedIds[p.id] = false
+  }
+
+  function handleLap(id) {
+    recordLap(id)
+    flashKeys[id] = (flashKeys[id] ?? 0) + 1
+  }
+
+  let anyHasLaps = $derived(
+    mode === 'lap' && participants.some(p => (participantTimers[p.id]?.laps?.length ?? 0) > 0)
+  )
 </script>
 
 <AddParticipant {addParticipant} />
+
+{#if anyHasLaps}
+  <div class="lap-controls">
+    <button class="lap-ctrl-btn" onclick={expandAll}>Show all</button>
+    <button class="lap-ctrl-btn" onclick={collapseAll}>Hide all</button>
+  </div>
+{/if}
 
 {#if participants.length === 0}
   <div class="empty-state">
@@ -23,9 +61,12 @@
           {heatPhase}
           timer={participantTimers[p.id] ?? null}
           {now}
+          expanded={expandedIds[p.id] ?? false}
+          flashKey={flashKeys[p.id] ?? 0}
+          onToggleExpand={() => toggleExpand(p.id)}
           onRemove={() => removeParticipant(p.id)}
           onStop={() => stopParticipant(p.id)}
-          onLap={() => recordLap(p.id)}
+          onLap={() => handleLap(p.id)}
         />
       </li>
     {/each}
@@ -55,6 +96,27 @@
 
   p {
     font-size: 15px;
+  }
+
+  .lap-controls {
+    display: flex;
+    gap: 6px;
+    margin: 8px 0 4px;
+    justify-content: flex-end;
+  }
+
+  .lap-ctrl-btn {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent);
+    background: transparent;
+    padding: 4px 10px;
+    border-radius: 4px;
+    transition: background 0.15s;
+  }
+
+  .lap-ctrl-btn:active {
+    background: var(--surface-raised);
   }
 
   .cards {
