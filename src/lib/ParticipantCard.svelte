@@ -118,6 +118,7 @@
 
   .name {
     flex: 1;
+    min-width: 0;
     font-size: 14px;
     font-weight: 500;
     overflow: hidden;

@@ -59,9 +59,20 @@
 
   .cards {
     list-style: none;
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: start;
     gap: 4px;
     margin-top: 8px;
+  }
+
+  .cards > li {
+    min-width: 0;
+  }
+
+  @media (min-width: 600px) {
+    .cards {
+      grid-template-columns: 1fr 1fr;
+    }
   }
 </style>

@@ -260,4 +260,13 @@
     overflow-y: auto;
     padding: 8px 10px;
   }
+
+  @media (min-width: 768px) {
+    .shell {
+      max-width: 680px;
+      margin: 0 auto;
+      border-left: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+    }
+  }
 </style>
