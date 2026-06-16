@@ -33,14 +33,11 @@
     if (vibrateOnLap) try { navigator.vibrate(50) } catch {}
   }
 
-  let anyHasLaps = $derived(
-    mode === 'lap' && participants.some(p => (participantTimers[p.id]?.laps?.length ?? 0) > 0)
-  )
 </script>
 
 <AddParticipant {addParticipant} />
 
-{#if anyHasLaps}
+{#if mode === 'lap'}
   <div class="lap-controls">
     <button class="lap-ctrl-btn" onclick={expandAll}>Show all</button>
     <button class="lap-ctrl-btn" onclick={collapseAll}>Hide all</button>

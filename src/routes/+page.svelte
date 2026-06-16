@@ -91,7 +91,7 @@
           if (!timer) { results[p.id] = null; continue }
           results[p.id] = timer.state === 'stopped'
             ? timer.elapsed
-            : timer.elapsed + (t - timer.startedAt)
+            : timer.elapsed + (timer.startedAt ? t - timer.startedAt : 0)
         }
         heats.push({ id: crypto.randomUUID(), number: heats.length + 1, timestamp: t, results })
       }
@@ -112,7 +112,7 @@
         if (!timer) { results[p.id] = { laps: [], elapsed: 0 }; continue }
         const elapsed = timer.state === 'stopped'
           ? timer.elapsed
-          : timer.elapsed + (t - timer.startedAt)
+          : timer.elapsed + (timer.startedAt ? t - timer.startedAt : 0)
         results[p.id] = { laps: $state.snapshot(timer.laps ?? []), elapsed }
       }
       session.archive.push({
@@ -188,6 +188,13 @@
     const t = Date.now()
     if (timer.startedAt) timer.elapsed += t - timer.startedAt
     timer.startedAt = null
+    // In lap mode, record the final lap at the stop point
+    if (session.mode === 'lap') {
+      const cumulative = timer.elapsed
+      const prev = timer.laps[timer.laps.length - 1]
+      const gap = prev ? cumulative - prev.cumulative : cumulative
+      timer.laps.push({ number: timer.laps.length + 1, cumulative, gap })
+    }
     timer.state = 'stopped'
     // freeze session clock when everyone is done
     const allDone = session.participants.every(p => participantTimers[p.id]?.state === 'stopped')
