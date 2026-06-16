@@ -10,13 +10,11 @@
       class="toggle-btn"
       class:active={mode === 'heat'}
       onclick={() => onModeChange('heat')}
-      disabled={heatPhase !== 'idle'}
     >Heat</button>
     <button
       class="toggle-btn"
       class:active={mode === 'lap'}
       onclick={() => onModeChange('lap')}
-      disabled={heatPhase !== 'idle'}
     >Lap</button>
   </div>
   <div class="session-clock" class:active={heatPhase !== 'idle'} aria-label="Session time" aria-live="off">
@@ -60,12 +58,7 @@
     color: white;
   }
 
-  .toggle-btn:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-  }
-
-  .session-clock {
+.session-clock {
     font-size: 22px;
     font-weight: 700;
     font-variant-numeric: tabular-nums;

@@ -6,7 +6,7 @@
   const STORAGE_KEY = 'gtta:session'
 
   function defaultSession() {
-    return { mode: 'heat', participants: [], history: [], lapState: null }
+    return { mode: 'heat', participants: [], archive: [], sessionArchiveStart: 0, lapState: null }
   }
 
   function loadSession() {
@@ -62,19 +62,65 @@
     session.participants.every(p => participantTimers[p.id]?.state === 'stopped')
   )
 
+  let heatHistory = $derived(
+    session.archive.slice(session.sessionArchiveStart).filter(e => e.type === 'heat')
+  )
+
   let atLeastOneStopped = $derived(
     heatPhase !== 'idle' &&
     session.participants.some(p => participantTimers[p.id]?.state === 'stopped')
   )
 
+  function commitCurrentState() {
+    if (heatPhase === 'idle') return
+    const t = Date.now()
+    if (session.mode === 'heat') {
+      const results = {}
+      for (const p of session.participants) {
+        const timer = participantTimers[p.id]
+        if (!timer) { results[p.id] = null; continue }
+        results[p.id] = timer.state === 'stopped'
+          ? timer.elapsed
+          : timer.elapsed + (t - timer.startedAt)
+      }
+      session.archive.push({
+        id: crypto.randomUUID(),
+        type: 'heat',
+        number: session.archive.filter(e => e.type === 'heat').length + 1,
+        timestamp: t,
+        participants: $state.snapshot(session.participants),
+        results
+      })
+    } else {
+      const results = {}
+      for (const p of session.participants) {
+        const timer = participantTimers[p.id]
+        if (!timer) { results[p.id] = { laps: [], elapsed: 0 }; continue }
+        const elapsed = timer.state === 'stopped'
+          ? timer.elapsed
+          : timer.elapsed + (t - timer.startedAt)
+        results[p.id] = { laps: $state.snapshot(timer.laps ?? []), elapsed }
+      }
+      session.archive.push({
+        id: crypto.randomUUID(),
+        type: 'run',
+        number: session.archive.filter(e => e.type === 'run').length + 1,
+        timestamp: t,
+        participants: $state.snapshot(session.participants),
+        results
+      })
+    }
+  }
+
   function setMode(m) {
-    if (heatPhase !== 'idle') return
-    if (session.history.length > 0 || session.lapState) {
-      if (!confirm(`Switch to ${m === 'heat' ? 'Heat' : 'Lap'} mode? This will reset the current session.`)) return
+    if (m === session.mode) return
+    if (heatPhase !== 'idle') {
+      if (!confirm(`Switch to ${m === 'heat' ? 'Heat' : 'Lap'} mode? The current session will be saved and reset.`)) return
+      commitCurrentState()
     }
     session.mode = m
-    session.history = []
-    session.lapState = null
+    session.sessionArchiveStart = session.archive.length
+    resetHeat()
   }
 
   function addParticipant(name) {
@@ -185,29 +231,35 @@
   }
 
   function newHeat() {
+    const t = Date.now()
     const results = {}
     for (const p of session.participants) {
       const timer = participantTimers[p.id]
       results[p.id] = timer?.state === 'stopped' ? timer.elapsed : null
     }
-    session.history.push({
+    session.archive.push({
       id: crypto.randomUUID(),
-      number: session.history.length + 1,
+      type: 'heat',
+      number: session.archive.filter(e => e.type === 'heat').length + 1,
+      timestamp: t,
+      participants: $state.snapshot(session.participants),
       results
     })
     resetHeat()
   }
 
   function newSession() {
+    if (heatPhase !== 'idle') commitCurrentState()
+    session.sessionArchiveStart = session.archive.length
     resetHeat()
-    session.history = []
   }
 
   function clearRoster() {
     if (!confirm('Remove all participants and clear all history?')) return
     resetHeat()
     session.participants = []
-    session.history = []
+    session.archive = []
+    session.sessionArchiveStart = 0
   }
 </script>
 
@@ -221,7 +273,7 @@
   <main>
     <ParticipantList
       participants={session.participants}
-      history={session.history}
+      history={heatHistory}
       mode={session.mode}
       {heatPhase}
       {participantTimers}
