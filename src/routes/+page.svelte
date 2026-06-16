@@ -171,7 +171,7 @@
     const timer = participantTimers[id]
     if (!timer || timer.state !== 'running') return
     const t = Date.now()
-    timer.elapsed += t - timer.startedAt
+    if (timer.startedAt) timer.elapsed += t - timer.startedAt
     timer.startedAt = null
     timer.state = 'stopped'
     // freeze session clock when everyone is done
