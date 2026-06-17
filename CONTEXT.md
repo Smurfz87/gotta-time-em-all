@@ -9,11 +9,11 @@ A person whose time is being recorded in a session. Can be added at any time, in
 _Avoid_: Athlete, player, user, person
 
 **Session**:
-The current in-progress timing activity. Has a mode (Heat, Lap, or Interval), a participant roster, and an active timer state. Mode is fixed for the lifetime of the session. "New session" resets the timer state and commits any in-progress results to the Archive, but keeps the participant roster. "Clear roster" removes all participants and clears the Archive. Mode switching also commits the in-progress state to the Archive before resetting.
+The current in-progress timing activity. Has a mode (Heat, Lap, Interval, or Rest), a participant roster, and an active timer state. Mode is fixed for the lifetime of the session. "New session" resets the timer state and commits any in-progress results to the Archive, but keeps the participant roster. "Clear roster" removes all participants and clears the Archive. Mode switching also commits the in-progress state to the Archive before resetting.
 _Avoid_: Event, workout, round
 
 **Archive**:
-The persistent cross-session list of all committed results. Each entry is a Heat Session, Run, or Interval Session, tagged with a timestamp. Survives mode switches and new sessions. Displayed on the History page as a numbered list ordered by time. Entries can be deleted individually or all at once, exported as JSON or CSV, and restored via JSON import.
+The persistent cross-session list of all committed results. Each entry is a Heat Session, Run, Interval Session, or Rest Session, tagged with a timestamp. Survives mode switches and new sessions. Displayed on the History page as a numbered list ordered by time. Entries can be deleted individually or all at once, exported as JSON or CSV, and restored via JSON import.
 _Avoid_: History (as a variable name — conflicts with browser History API), log, record list
 
 **Run**:
@@ -61,8 +61,8 @@ The target cycle duration for a Pace Group in Interval mode — the time from on
 _Avoid_: Start time, target time, interval time
 
 **Rep**:
-One completion of the set distance by a participant in Interval mode. Recorded when the trainer taps the participant's button. Not recorded automatically when the Send-off expires — only an explicit tap creates a Rep entry.
-_Avoid_: Repetition, round, lap (in Interval mode context)
+One completion of the set distance by a participant in Interval or Rest mode. Recorded when the trainer taps the participant's button. Not recorded automatically — only an explicit tap creates a Rep entry.
+_Avoid_: Repetition, round, lap (in Interval or Rest mode context)
 
 **Interval Session**:
 A committed Interval mode Archive entry, containing all Pace Groups, their Send-offs, overflow behaviour config, and each participant's Rep times for that session.
@@ -71,3 +71,15 @@ _Avoid_: Interval run, interval result
 **Overflow**:
 The state a participant enters when they have not completed their Rep before their Pace Group's Send-off resets. Overflow behaviour is session-level configurable with three options — Rejoin (participant continues on the group's rolling timer, already in progress), Reset (fresh full Send-off from their finish time), or Reset + buffer (fresh Send-off plus a trainer-configured number of extra seconds).
 _Avoid_: Timeout, late, missed
+
+**Roster**:
+A named, saved list of participants that can be loaded into a session. Exists independently of any active session. Loading a Roster replaces the session's current participant list — if a session is in progress, the trainer is prompted to commit and reset first. A Roster is a template: loading it copies the participant list into the session; subsequent changes to the session's participants do not affect the saved Roster. Rosters store participant names only — Interval mode Pace Group assignments are not included. Managed on the Roster page, accessible via Settings.
+_Avoid_: Template, squad, group, team
+
+**Rest mode**:
+A timing mode where all participants start simultaneously and each records Reps independently. After each Rep, a personal rest countdown begins for that participant. When the countdown expires, their next Rep starts automatically. Rest duration is configured once for the whole session and applies equally to all participants. No pause — the session runs until the trainer stops it. Rep count is optional; when set, a progress counter is shown per participant.
+_Avoid_: Recovery mode, interval mode (distinct concept)
+
+**Rest Session**:
+A committed Rest mode Archive entry, containing the configured rest duration, rep count (if set), and each participant's Rep times. Displayed in the History list as "Rest Session N — Xs rest · Y reps".
+_Avoid_: Rest run, rest result
