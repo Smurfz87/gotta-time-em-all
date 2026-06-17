@@ -4,6 +4,7 @@
   import BottomControls from '$lib/BottomControls.svelte'
   import { readSession, writeSession, readSettings } from '$lib/storage.js'
   import { getInitials } from '$lib/utils.js'
+  import { computeElapsed, makeLap } from '$lib/timer.js'
 
   const settings = { vibrateOnLap: false, ...readSettings() }
 
@@ -72,7 +73,7 @@
           if (!timer) { results[p.id] = null; continue }
           results[p.id] = timer.state === 'stopped'
             ? timer.elapsed
-            : timer.elapsed + (timer.startedAt ? t - timer.startedAt : 0)
+            : computeElapsed(timer.elapsed, timer.startedAt, t)
         }
         heats.push({ id: crypto.randomUUID(), number: heats.length + 1, timestamp: t, results })
       }
@@ -93,7 +94,7 @@
         if (!timer) { results[p.id] = { laps: [], elapsed: 0 }; continue }
         const elapsed = timer.state === 'stopped'
           ? timer.elapsed
-          : timer.elapsed + (timer.startedAt ? t - timer.startedAt : 0)
+          : computeElapsed(timer.elapsed, timer.startedAt, t)
         results[p.id] = { laps: $state.snapshot(timer.laps ?? []), elapsed }
       }
       session.archive.push({
@@ -167,14 +168,10 @@
     const timer = participantTimers[id]
     if (!timer || timer.state !== 'running') return
     const t = Date.now()
-    if (timer.startedAt) timer.elapsed += t - timer.startedAt
+    timer.elapsed = computeElapsed(timer.elapsed, timer.startedAt, t)
     timer.startedAt = null
-    // In lap mode, record the final lap at the stop point
     if (session.mode === 'lap') {
-      const cumulative = timer.elapsed
-      const prev = timer.laps[timer.laps.length - 1]
-      const gap = prev ? cumulative - prev.cumulative : cumulative
-      timer.laps.push({ number: timer.laps.length + 1, cumulative, gap })
+      timer.laps.push(makeLap(timer.laps, timer.elapsed, null, t))
     }
     timer.state = 'stopped'
     // freeze session clock when everyone is done
@@ -193,18 +190,15 @@
     const timer = participantTimers[id]
     if (!timer || timer.state !== 'running' || heatPhase !== 'running') return
     const t = Date.now()
-    const cumulative = timer.elapsed + (t - timer.startedAt)
-    const prev = timer.laps[timer.laps.length - 1]
-    const gap = prev ? cumulative - prev.cumulative : cumulative
-    timer.laps.push({ number: timer.laps.length + 1, cumulative, gap })
+    timer.laps.push(makeLap(timer.laps, timer.elapsed, timer.startedAt, t))
   }
 
   function pauseAll() {
     const t = Date.now()
     for (const id in participantTimers) {
       const timer = participantTimers[id]
-      if (timer.state === 'running' && timer.startedAt) {
-        timer.elapsed += t - timer.startedAt
+      if (timer.state === 'running') {
+        timer.elapsed = computeElapsed(timer.elapsed, timer.startedAt, t)
         timer.startedAt = null
       }
     }
