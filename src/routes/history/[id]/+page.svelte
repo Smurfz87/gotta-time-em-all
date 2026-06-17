@@ -2,11 +2,11 @@
   import { base } from '$app/paths'
   import { goto } from '$app/navigation'
   import { formatElapsed } from '$lib/time.js'
+  import { readSession, writeSession } from '$lib/storage.js'
+  import { buildHeatCsv, buildRunCsv } from '$lib/csv.js'
+  import PageShell from '$lib/PageShell.svelte'
 
   let { data } = $props()
-
-  import { readSession, writeSession } from '$lib/storage.js'
-  import PageShell from '$lib/PageShell.svelte'
 
   let archive = $state(readSession().archive ?? [])
   let entry = $derived(archive.find(e => e.id === data.id) ?? null)
@@ -14,43 +14,12 @@
   function exportCsv() {
     if (!entry) return
     const date = new Date(entry.timestamp).toISOString().slice(0, 10)
-    const filename = `${entry.type}-${date}.csv`
-    let csv = ''
-
-    if (entry.type === 'heat') {
-      const sorted = heatResults()
-      const heatList = heats
-      const header = ['Participant', ...heatList.map(h => `Heat ${h.number}`), 'Best'].join(',')
-      const rows = sorted.map(p => {
-        const times = heatList.map(h => {
-          const t = h.results[p.id]
-          return t != null ? formatElapsed(t) : 'DNF'
-        })
-        const best = heatList.reduce((m, h) => {
-          const t = h.results[p.id]
-          return t != null && (m == null || t < m) ? t : m
-        }, null)
-        return [p.name, ...times, best != null ? formatElapsed(best) : 'DNF'].join(',')
-      })
-      csv = [header, ...rows].join('\n')
-    } else {
-      const lines = ['Participant,Lap,Gap,Cumulative']
-      for (const p of entry.participants) {
-        const result = entry.results[p.id]
-        if (!result) continue
-        for (const lap of result.laps) {
-          lines.push(`${p.name},${lap.number},${formatElapsed(lap.gap)},${formatElapsed(lap.cumulative)}`)
-        }
-        lines.push(`${p.name},Total,,${formatElapsed(result.elapsed)}`)
-      }
-      csv = lines.join('\n')
-    }
-
+    const csv = entry.type === 'heat' ? buildHeatCsv(entry) : buildRunCsv(entry)
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = filename
+    a.download = `${entry.type}-${date}.csv`
     a.click()
     URL.revokeObjectURL(url)
   }
