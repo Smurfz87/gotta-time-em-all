@@ -4,6 +4,7 @@
   import { readSession, writeSession, readSettings, writeSettings } from '$lib/storage.js'
   import { getInitials } from '$lib/utils.js'
   import PageShell from '$lib/PageShell.svelte'
+  import { base } from '$app/paths'
 
   let settings = $state({ vibrateOnLap: false, ...readSettings() })
   let canVibrate = $state(false)
@@ -127,6 +128,16 @@
   <div class="sections">
     <div class="section">
       <div class="section-title">Roster</div>
+      <a href="{base}/rosters" class="setting-row btn-row">
+        <div class="setting-label">
+          <span class="setting-title">Saved rosters</span>
+          <span class="setting-desc">Save and load named participant lists</span>
+        </div>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="row-icon">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </a>
+      <div class="row-divider"></div>
       <button class="setting-row btn-row" onclick={openQrModal}>
         <div class="setting-label">
           <span class="setting-title">Share roster</span>
@@ -267,6 +278,8 @@
     background: transparent;
     cursor: pointer;
     transition: background 0.15s;
+    text-decoration: none;
+    color: inherit;
   }
 
   .btn-row:hover {
