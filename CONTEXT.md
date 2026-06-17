@@ -13,7 +13,7 @@ The current in-progress timing activity. Has a mode (Heat or Lap), a participant
 _Avoid_: Event, workout, round
 
 **Archive**:
-The persistent cross-session list of all committed results. Each entry is either a Heat or a Run, tagged with a timestamp. Survives mode switches and new sessions. Displayed on the History page as a numbered list ordered by time. Entries can be deleted individually or all at once.
+The persistent cross-session list of all committed results. Each entry is either a Heat Session or a Run, tagged with a timestamp. Survives mode switches and new sessions. Displayed on the History page as a numbered list ordered by time. Entries can be deleted individually or all at once, exported as JSON or CSV, and restored via JSON import.
 _Avoid_: History (as a variable name — conflicts with browser History API), log, record list
 
 **Run**:
@@ -39,3 +39,11 @@ _Avoid_: Duration, timestamp
 **Heat**:
 A single run within a Heat mode session — one start event followed by each participant's individual finish. Per-participant state is one-way: `running → stopped`. Multiple heats can occur within one session; the trainer advances explicitly via "New Heat".
 _Avoid_: Exercise, race, round
+
+**Heat Session**:
+A group of one or more Heats committed together as a single Archive entry when a session ends or the mode is switched. Displayed in the History list as one row ("Heat Session N — X heats") and in the detail view as a grid (rows = heats, columns = participants). Pending heats accumulate in memory during a session and are only written to the Archive on commit.
+_Avoid_: Heat group, session batch, heat set
+
+**History**:
+The page that lists all Archive entries, ordered newest-first. Provides navigation to individual entry detail views, and archive-level actions: JSON export, JSON import, and delete all.
+_Avoid_: Log, records, results list
