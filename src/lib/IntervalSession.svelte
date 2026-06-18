@@ -1,18 +1,8 @@
 <script>
   import { formatElapsed, formatDuration } from './time.js'
+  import { avatarColor } from './utils.js'
 
   let { intervalConfig, intervalParticipants, intervalSessionStart, participants, now, recordIntervalRep } = $props()
-
-  const AVATAR_COLORS = [
-    '#3b82f6', '#8b5cf6', '#ec4899', '#10b981',
-    '#f59e0b', '#ef4444', '#06b6d4', '#84cc16'
-  ]
-
-  function avatarColor(name) {
-    let hash = 0
-    for (const c of name) hash = (hash * 31 + c.charCodeAt(0)) & 0xffffffff
-    return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]
-  }
 
   let participantMap = $derived(
     Object.fromEntries(participants.map(p => [p.id, p]))

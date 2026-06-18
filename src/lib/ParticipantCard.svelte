@@ -1,18 +1,9 @@
 <script>
   import { formatElapsed } from './time.js'
+  import { avatarColor } from './utils.js'
+  import LapHistory from './LapHistory.svelte'
 
-  let { participant, mode, heatPhase, timer, intervalTimer, now, expanded, flashKey, onToggleExpand, onRemove, onStop, onLap, onRep } = $props()
-
-  const AVATAR_COLORS = [
-    '#3b82f6', '#8b5cf6', '#ec4899', '#10b981',
-    '#f59e0b', '#ef4444', '#06b6d4', '#84cc16'
-  ]
-
-  function avatarColor(name) {
-    let hash = 0
-    for (const c of name) hash = (hash * 31 + c.charCodeAt(0)) & 0xffffffff
-    return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]
-  }
+  let { participant, mode, heatPhase, timer, now, expanded, flashKey, onToggleExpand, onRemove, onStop, onLap } = $props()
 
   let color = $derived(avatarColor(participant.name))
 
@@ -55,21 +46,7 @@
       <span class="name">{participant.name}</span>
     </div>
 
-    {#if mode === 'interval' && intervalTimer}
-      {#if intervalTimer.state === 'active' || intervalTimer.state === 'overdue'}
-        <span class="elapsed ticking" class:overdue={intervalTimer.state === 'overdue'}>
-          {formatElapsed(now - intervalTimer.repStartedAt)}
-        </span>
-        <span class="rep-count">×{intervalTimer.reps.length}</span>
-        <button class="lap-btn" onclick={onRep} aria-label="Rep {participant.name}">Rep</button>
-      {:else if intervalTimer.state === 'resting'}
-        <span class="rep-count">×{intervalTimer.reps.length}</span>
-        <span class="resting-badge">Resting</span>
-      {:else if intervalTimer.state === 'done'}
-        <span class="rep-count">×{intervalTimer.reps.length}</span>
-        <span class="done-badge" aria-label="Done">✓</span>
-      {/if}
-    {:else if inSession}
+    {#if inSession}
       <span class="elapsed" class:ticking={isRunning}>{formatElapsed(elapsed)}</span>
       {#if laps.length > 0}
         <span class="lap-count">×{laps.length}</span>
@@ -99,27 +76,8 @@
     {/key}
   </div>
 
-  {#if expanded && laps.length > 0}
-    <div class="laps">
-      <table>
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Gap</th>
-            <th>Cumulative</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each laps as lap (lap.number)}
-            <tr>
-              <td class="lap-num">{lap.number}</td>
-              <td>{formatElapsed(lap.gap)}</td>
-              <td class="cumulative">{formatElapsed(lap.cumulative)}</td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
-    </div>
+  {#if expanded}
+    <LapHistory {laps} />
   {/if}
 </div>
 
@@ -208,27 +166,6 @@
 
   .elapsed.ticking {
     color: var(--text);
-  }
-
-  .elapsed.overdue {
-    color: var(--warning, #f59e0b);
-  }
-
-  .rep-count {
-    font-size: 12px;
-    font-weight: 700;
-    color: var(--accent);
-    flex-shrink: 0;
-    min-width: 20px;
-    text-align: right;
-  }
-
-  .resting-badge {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text-muted);
-    flex-shrink: 0;
-    opacity: 0.6;
   }
 
   .lap-count {
@@ -335,49 +272,5 @@
   @keyframes lap-flash {
     from { opacity: 1; }
     to   { opacity: 0; }
-  }
-
-  /* Lap history table */
-  .laps {
-    border-top: 1px solid var(--border);
-  }
-
-  .laps table {
-    width: 100%;
-    border-collapse: collapse;
-  }
-
-  .laps th, .laps td {
-    padding: 4px 10px;
-    font-size: 12px;
-    text-align: right;
-  }
-
-  .laps th {
-    color: var(--text-muted);
-    font-weight: 600;
-    font-size: 11px;
-    background: color-mix(in srgb, var(--surface) 60%, var(--bg) 40%);
-    border-bottom: 1px solid var(--border);
-  }
-
-  .laps td {
-    font-variant-numeric: tabular-nums;
-    color: var(--text);
-    border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
-  }
-
-  .laps tr:last-child td {
-    border-bottom: none;
-  }
-
-  .lap-num {
-    text-align: left;
-    color: var(--text-muted);
-    font-weight: 600;
-  }
-
-  .cumulative {
-    font-weight: 600;
   }
 </style>
