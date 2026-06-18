@@ -1,5 +1,6 @@
 <script>
   import AddParticipant from './AddParticipant.svelte'
+  import { formatDuration } from './time.js'
 
   let { intervalConfig, participants, addParticipant } = $props()
 
@@ -52,13 +53,6 @@
     group.participantIds = group.participantIds.filter(id => id !== participantId)
   }
 
-  function formatSendOff(ms) {
-    const total = Math.round(ms / 1000)
-    const m = Math.floor(total / 60)
-    const s = total % 60
-    return `${m}:${s.toString().padStart(2, '0')}`
-  }
-
   function parseSendOff(str) {
     const parts = str.trim().split(':')
     if (parts.length === 2) {
@@ -71,7 +65,7 @@
 
   function handleSendOffBlur(group, e) {
     group.sendOff = parseSendOff(e.target.value)
-    e.target.value = formatSendOff(group.sendOff)
+    e.target.value = formatDuration(group.sendOff)
   }
 
   function handleRepCountInput(e) {
@@ -103,7 +97,7 @@
         />
         <input
           class="sendoff-input"
-          value={formatSendOff(group.sendOff)}
+          value={formatDuration(group.sendOff)}
           onblur={(e) => handleSendOffBlur(group, e)}
           aria-label="Send-off (mm:ss)"
           title="Send-off time in mm:ss"

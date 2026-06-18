@@ -2,6 +2,7 @@
   import TopBar from '$lib/TopBar.svelte'
   import ParticipantList from '$lib/ParticipantList.svelte'
   import IntervalSetup from '$lib/IntervalSetup.svelte'
+  import IntervalSession from '$lib/IntervalSession.svelte'
   import BottomControls from '$lib/BottomControls.svelte'
   import { readSession, writeSession, readSettings } from '$lib/storage.js'
   import { getInitials } from '$lib/utils.js'
@@ -46,14 +47,17 @@
   }
 
   $effect(() => {
-    if (heatPhase !== 'running' || allStopped) return
+    if (heatPhase !== 'running' || allStopped || allIntervalDone) return
     const id = setInterval(() => { now = Date.now() }, 50)
     return () => clearInterval(id)
   })
 
-  // Advance interval participants between resting and active as group cycles tick over.
+  // Advance interval participants between states as group cycles tick over.
   // Reads `now` (tracked) but mutates `intervalParticipants` (untracked) to avoid a
   // reactive cycle — mutations flow to session.intervalState via the shared reference.
+  //
+  // Participants on a personal clock (reset/reset+buffer overflow) have personalOverdueAt
+  // set and are handled independently of the group cycle.
   $effect(() => {
     if (session.mode !== 'interval' || heatPhase !== 'running') return
     const t = now
@@ -67,17 +71,21 @@
         for (const pId of (group.participantIds ?? [])) {
           const p = intervalParticipants[pId]
           if (!p || p.state === 'done') continue
-          if (p.state === 'resting') {
-            if (p.personalNextStart !== null && t >= p.personalNextStart) {
-              p.repStartedAt = t
-              p.state = 'active'
-              p.personalNextStart = null
-              p.lastGroupCycle = currentCycle
-            } else if (p.personalNextStart === null && currentCycle > p.lastGroupCycle) {
-              p.repStartedAt = sessionStart + currentCycle * sendOff
-              p.state = 'active'
-              p.lastGroupCycle = currentCycle
+
+          if (p.personalOverdueAt !== null) {
+            // Personal clock: only check for overdue transition
+            if (p.state === 'active' && t >= p.personalOverdueAt) {
+              p.state = 'overdue'
+              p.personalOverdueAt = null
             }
+            continue
+          }
+
+          // Group clock
+          if (p.state === 'resting' && currentCycle > p.lastGroupCycle) {
+            p.repStartedAt = sessionStart + currentCycle * sendOff
+            p.state = 'active'
+            p.lastGroupCycle = currentCycle
           } else if (p.state === 'active' && currentCycle > p.lastGroupCycle) {
             p.state = 'overdue'
             p.lastGroupCycle = currentCycle
@@ -98,6 +106,13 @@
     heatPhase !== 'idle' &&
     session.participants.length > 0 &&
     session.participants.every(p => participantTimers[p.id]?.state === 'stopped')
+  )
+
+  let allIntervalDone = $derived(
+    session.mode === 'interval' &&
+    heatPhase === 'running' &&
+    session.participants.length > 0 &&
+    session.participants.every(p => intervalParticipants[p.id]?.state === 'done')
   )
 
   let heatHistory = $derived(session.pendingHeats)
@@ -230,7 +245,7 @@
       const participants = {}
       for (const group of (session.intervalConfig?.paceGroups ?? [])) {
         for (const pId of (group.participantIds ?? [])) {
-          participants[pId] = { state: 'active', repStartedAt: t, reps: [], lastGroupCycle: 0, personalNextStart: null }
+          participants[pId] = { state: 'active', repStartedAt: t, reps: [], lastGroupCycle: 0, personalOverdueAt: null }
         }
       }
       session.intervalState = { phase: 'running', sessionStart: t, participants }
@@ -277,6 +292,7 @@
     const p = intervalParticipants[id]
     if (!p || (p.state !== 'active' && p.state !== 'overdue') || heatPhase !== 'running') return
     const t = Date.now()
+    const wasOverdue = p.state === 'overdue'
     p.reps.push({ number: p.reps.length + 1, elapsed: t - p.repStartedAt })
 
     const maxReps = session.intervalConfig?.repCount ?? null
@@ -285,24 +301,34 @@
       return
     }
 
-    if (p.state === 'overdue') {
-      const group = (session.intervalConfig?.paceGroups ?? []).find(g => (g.participantIds ?? []).includes(id))
-      const sendOff = group?.sendOff ?? 60000
+    const group = (session.intervalConfig?.paceGroups ?? []).find(g => (g.participantIds ?? []).includes(id))
+    const sendOff = group?.sendOff ?? 60000
+
+    if (wasOverdue) {
       const behavior = session.intervalConfig?.overflowBehavior ?? 'reset'
       const buffer = session.intervalConfig?.overflowBuffer ?? 0
       if (behavior === 'rejoin') {
-        p.state = 'resting'
-        p.personalNextStart = null
+        // Immediately active on the group clock — lastGroupCycle already at current cycle,
+        // so the next cycle boundary will trigger overdue as normal
+        p.state = 'active'
+        p.repStartedAt = t
+        p.personalOverdueAt = null
       } else if (behavior === 'reset+buffer') {
-        p.state = 'resting'
-        p.personalNextStart = t + sendOff + buffer
+        // Immediately active on a personal clock with enlarged send-off
+        p.state = 'active'
+        p.repStartedAt = t
+        p.personalOverdueAt = t + sendOff + buffer
       } else {
-        p.state = 'resting'
-        p.personalNextStart = t + sendOff
+        // reset — immediately active, personal clock with original send-off
+        p.state = 'active'
+        p.repStartedAt = t
+        p.personalOverdueAt = t + sendOff
       }
     } else {
+      // On-time finish — rest until next group cycle
       p.state = 'resting'
-      p.personalNextStart = null
+      p.personalOverdueAt = null
+      p.lastGroupCycle = Math.floor((t - (intervalSessionStart ?? t)) / sendOff)
     }
   }
 
@@ -376,12 +402,23 @@
     onModeChange={setMode}
   />
   <main>
-    {#if session.mode === 'interval' && heatPhase === 'idle'}
-      <IntervalSetup
-        intervalConfig={session.intervalConfig}
-        participants={session.participants}
-        {addParticipant}
-      />
+    {#if session.mode === 'interval'}
+      {#if heatPhase === 'idle'}
+        <IntervalSetup
+          intervalConfig={session.intervalConfig}
+          participants={session.participants}
+          {addParticipant}
+        />
+      {:else}
+        <IntervalSession
+          intervalConfig={session.intervalConfig}
+          {intervalParticipants}
+          {intervalSessionStart}
+          participants={session.participants}
+          {now}
+          {recordIntervalRep}
+        />
+      {/if}
     {:else}
       <ParticipantList
         participants={session.participants}
