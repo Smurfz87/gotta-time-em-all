@@ -3,6 +3,7 @@
   import ParticipantList from '$lib/ParticipantList.svelte'
   import IntervalSetup from '$lib/IntervalSetup.svelte'
   import IntervalSession from '$lib/IntervalSession.svelte'
+  import RestSession from '$lib/RestSession.svelte'
   import BottomControls from '$lib/BottomControls.svelte'
   import { readSettings } from '$lib/storage.js'
   import { createSession } from '$lib/session.svelte.js'
@@ -35,22 +36,13 @@
         />
       {/if}
     {:else if s.session.mode === 'rest' && s.heatPhase !== 'idle'}
-      <!-- RestSession.svelte added in #32 -->
-      <div class="rest-placeholder">
-        <p>Rest session running — full UI coming in #32</p>
-        <ul>
-          {#each s.session.participants as p (p.id)}
-            {@const rp = s.restParticipants[p.id]}
-            <li>
-              {p.name}: {rp?.state ?? '?'}
-              ({rp?.reps?.length ?? 0} reps)
-              {#if rp?.state === 'effort'}
-                <button onclick={() => s.recordRestRep(p.id)}>Rep</button>
-              {/if}
-            </li>
-          {/each}
-        </ul>
-      </div>
+      <RestSession
+        participants={s.session.participants}
+        restParticipants={s.restParticipants}
+        restConfig={s.session.restConfig}
+        now={s.now}
+        recordRestRep={s.recordRestRep}
+      />
     {:else}
       <ParticipantList
         participants={s.session.participants}
@@ -107,25 +99,4 @@
     }
   }
 
-  .rest-placeholder {
-    padding: 24px 16px;
-    color: var(--text-muted);
-    font-size: 14px;
-  }
-
-  .rest-placeholder ul {
-    margin-top: 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    list-style: none;
-    padding: 0;
-  }
-
-  .rest-placeholder li {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    color: var(--text);
-  }
 </style>
