@@ -25,6 +25,15 @@
     height: 100dvh;
   }
 
+  @media (min-width: 768px) {
+    .page {
+      max-width: 680px;
+      margin: 0 auto;
+      border-left: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+    }
+  }
+
   header {
     display: flex;
     align-items: center;
