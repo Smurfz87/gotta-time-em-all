@@ -83,3 +83,7 @@ _Avoid_: Recovery mode, interval mode (distinct concept)
 **Rest Session**:
 A committed Rest mode Archive entry, containing the configured rest duration, rep count (if set), and each participant's Rep times. Displayed in the History list as "Rest Session N — Xs rest · Y reps".
 _Avoid_: Rest run, rest result
+
+**Sync Window**:
+A configurable grace period (default 3 seconds, set globally in Settings) used in Rest mode. When multiple participants record a Rep within the Sync Window of the first tap in the batch, they share the same rest timer — their restEndsAt is calculated from the first tap's timestamp, not their individual tap times. The window is fixed from the first tap: a batch closes once the Sync Window has elapsed from that anchor, regardless of subsequent taps.
+_Avoid_: Grouping window, snap tolerance, batch window
