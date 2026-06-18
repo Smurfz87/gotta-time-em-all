@@ -250,6 +250,10 @@
     resetHeat()
   }
 
+  function reorderParticipants(newOrder) {
+    session.participants = newOrder
+  }
+
   function clearRoster() {
     if (!confirm('Remove all participants and clear all history?')) return
     resetHeat()
@@ -277,6 +281,7 @@
       {now}
       {addParticipant}
       {removeParticipant}
+      {reorderParticipants}
       {stopParticipant}
       {recordLap}
       vibrateOnLap={settings.vibrateOnLap}

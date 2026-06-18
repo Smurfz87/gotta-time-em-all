@@ -1,9 +1,13 @@
 <script>
+  import { dndzone } from 'svelte-dnd-action'
   import AddParticipant from './AddParticipant.svelte'
   import ParticipantCard from './ParticipantCard.svelte'
   import HeatResultsGrid from './HeatResultsGrid.svelte'
 
-  let { participants, history, mode, heatPhase, participantTimers, now, addParticipant, removeParticipant, stopParticipant, recordLap, vibrateOnLap } = $props()
+  let { participants, history, mode, heatPhase, participantTimers, now, addParticipant, removeParticipant, stopParticipant, recordLap, vibrateOnLap, reorderParticipants } = $props()
+
+  let items = $state([...participants])
+  $effect(() => { items = [...participants] })
 
   let expandedIds = $state({})
   let flashKeys = $state({})
@@ -33,6 +37,11 @@
     if (vibrateOnLap) try { navigator.vibrate(50) } catch {}
   }
 
+  function handleConsider(e) { items = e.detail.items }
+  function handleFinalize(e) {
+    items = e.detail.items
+    reorderParticipants(items.map(({ id, name, initials }) => ({ id, name, initials })))
+  }
 </script>
 
 <AddParticipant {addParticipant} />
@@ -50,8 +59,14 @@
     <p>No participants yet</p>
   </div>
 {:else}
-  <ul class="cards" aria-label="Participants">
-    {#each participants as p (p.id)}
+  <ul
+    class="cards"
+    aria-label="Participants"
+    use:dndzone={{ items, flipDurationMs: 150, type: 'participants' }}
+    onconsider={handleConsider}
+    onfinalize={handleFinalize}
+  >
+    {#each items as p (p.id)}
       <li>
         <ParticipantCard
           participant={p}

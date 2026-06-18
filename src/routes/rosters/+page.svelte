@@ -1,6 +1,7 @@
 <script>
   import { base } from '$app/paths'
   import { goto } from '$app/navigation'
+  import { dndzone } from 'svelte-dnd-action'
   import PageShell from '$lib/PageShell.svelte'
   import { readRosters, writeRosters, readSession, writeSession } from '$lib/storage.js'
   import { getInitials } from '$lib/utils.js'
@@ -186,9 +187,21 @@
         />
 
         {#if modalParticipants.length > 0}
-          <ul class="participant-list">
-            {#each modalParticipants as p}
+          <ul
+            class="participant-list"
+            use:dndzone={{ items: modalParticipants, flipDurationMs: 150, type: 'roster-modal' }}
+            onconsider={(e) => { modalParticipants = e.detail.items }}
+            onfinalize={(e) => { modalParticipants = e.detail.items.map(({ id, name, initials }) => ({ id, name, initials })) }}
+          >
+            {#each modalParticipants as p (p.id)}
               <li class="participant-item">
+                <div class="drag-handle" aria-hidden="true">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                    <circle cx="4" cy="3" r="1.2"/><circle cx="10" cy="3" r="1.2"/>
+                    <circle cx="4" cy="7" r="1.2"/><circle cx="10" cy="7" r="1.2"/>
+                    <circle cx="4" cy="11" r="1.2"/><circle cx="10" cy="11" r="1.2"/>
+                  </svg>
+                </div>
                 <span class="p-name">{p.name}</span>
                 <button class="remove-btn" onclick={() => removeFromModal(p.id)} aria-label="Remove {p.name}">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -466,14 +479,27 @@
   .participant-item {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    gap: 8px;
     padding: 10px 12px;
     border-bottom: 1px solid var(--border);
   }
 
+  .participant-item .drag-handle {
+    display: flex;
+    align-items: center;
+    color: var(--text-muted);
+    opacity: 0.4;
+    cursor: grab;
+    flex-shrink: 0;
+    touch-action: none;
+  }
+
+  .participant-item .drag-handle:active { cursor: grabbing; }
+
   .participant-item:last-child { border-bottom: none; }
 
   .p-name {
+    flex: 1;
     font-size: 14px;
     color: var(--text);
   }

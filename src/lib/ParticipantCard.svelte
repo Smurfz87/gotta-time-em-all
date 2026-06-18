@@ -32,6 +32,13 @@
 
 <div class="card-wrap" class:has-laps={expanded && laps.length > 0}>
   <div class="card" class:stopped={isStopped}>
+    <div class="drag-handle" aria-hidden="true">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+        <circle cx="4" cy="3" r="1.2"/><circle cx="10" cy="3" r="1.2"/>
+        <circle cx="4" cy="7" r="1.2"/><circle cx="10" cy="7" r="1.2"/>
+        <circle cx="4" cy="11" r="1.2"/><circle cx="10" cy="11" r="1.2"/>
+      </svg>
+    </div>
     <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
     <div
       class="name-area"
@@ -109,12 +116,27 @@
     overflow: hidden;
   }
 
+  .drag-handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 100%;
+    color: var(--text-muted);
+    opacity: 0.4;
+    cursor: grab;
+    flex-shrink: 0;
+    touch-action: none;
+  }
+
+  .drag-handle:active { cursor: grabbing; }
+
   .card {
     position: relative;
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 0 10px;
+    padding: 0 10px 0 6px;
     height: 44px;
     transition: background 0.2s;
     overflow: hidden;
