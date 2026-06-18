@@ -1,8 +1,7 @@
 <script>
-  import { formatElapsed } from './time.js'
   import { base } from '$app/paths'
 
-  let { mode, onModeChange, sessionElapsed, heatPhase } = $props()
+  let { mode, onModeChange } = $props()
 </script>
 
 <header>
@@ -17,9 +16,11 @@
       class:active={mode === 'lap'}
       onclick={() => onModeChange('lap')}
     >Lap</button>
-  </div>
-  <div class="session-clock" class:active={heatPhase !== 'idle'} aria-label="Session time" aria-live="off">
-    {formatElapsed(sessionElapsed)}
+    <button
+      class="toggle-btn"
+      class:active={mode === 'interval'}
+      onclick={() => onModeChange('interval')}
+    >Interval</button>
   </div>
   <div class="nav-icons">
     <a href="{base}/history" class="icon-link" aria-label="History">
@@ -58,7 +59,7 @@
   }
 
   .toggle-btn {
-    padding: 6px 18px;
+    padding: 6px 12px;
     border-radius: 6px;
     background: transparent;
     color: var(--text-muted);
@@ -71,19 +72,6 @@
   .toggle-btn.active {
     background: var(--accent);
     color: white;
-  }
-
-.session-clock {
-    font-size: 22px;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: 0.03em;
-    color: var(--text-muted);
-    transition: color 0.2s;
-  }
-
-  .session-clock.active {
-    color: var(--text);
   }
 
   .nav-icons {

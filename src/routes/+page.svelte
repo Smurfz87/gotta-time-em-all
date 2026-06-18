@@ -5,11 +5,21 @@
   import { readSession, writeSession, readSettings } from '$lib/storage.js'
   import { getInitials } from '$lib/utils.js'
   import { computeElapsed, makeLap } from '$lib/timer.js'
+  import { untrack } from 'svelte'
 
   const settings = { vibrateOnLap: false, ...readSettings() }
 
   function defaultSession() {
-    return { mode: 'heat', participants: [], archive: [], sessionArchiveStart: 0, lapState: null, pendingHeats: [] }
+    return {
+      mode: 'heat',
+      participants: [],
+      archive: [],
+      sessionArchiveStart: 0,
+      lapState: null,
+      intervalState: null,
+      intervalConfig: { repCount: null, overflowBehavior: 'reset', overflowBuffer: 30000, paceGroups: [] },
+      pendingHeats: []
+    }
   }
 
   function loadSession() {
@@ -19,18 +29,19 @@
   let session = $state(loadSession())
   let heatPhase = $state('idle')
   let participantTimers = $state({})
-  let sessionTimer = $state({ elapsed: 0, startedAt: null })
+  let intervalParticipants = $state({})
+  let intervalSessionStart = $state(null)
   let now = $state(Date.now())
 
-  // Restore lap session on page reload — startedAt timestamps are wall-clock epoch
+  // Restore in-progress session on page reload — timestamps are wall-clock epoch
   // values so elapsed time continues accumulating correctly without any adjustment
   if (session.lapState?.phase && session.lapState.phase !== 'idle') {
     heatPhase = session.lapState.phase
     participantTimers = session.lapState.participants ?? {}
-    sessionTimer = {
-      elapsed: session.lapState.sessionElapsed ?? 0,
-      startedAt: session.lapState.sessionStartedAt ?? null
-    }
+  } else if (session.intervalState?.phase === 'running') {
+    heatPhase = 'running'
+    intervalParticipants = session.intervalState.participants ?? {}
+    intervalSessionStart = session.intervalState.sessionStart ?? null
   }
 
   $effect(() => {
@@ -39,17 +50,50 @@
     return () => clearInterval(id)
   })
 
+  // Advance interval participants between resting and active as group cycles tick over.
+  // Reads `now` (tracked) but mutates `intervalParticipants` (untracked) to avoid a
+  // reactive cycle — mutations flow to session.intervalState via the shared reference.
+  $effect(() => {
+    if (session.mode !== 'interval' || heatPhase !== 'running') return
+    const t = now
+    untrack(() => {
+      const groups = session.intervalConfig?.paceGroups ?? []
+      for (const group of groups) {
+        const sendOff = group.sendOff ?? 60000
+        const sessionStart = intervalSessionStart
+        if (!sessionStart) continue
+        const currentCycle = Math.floor((t - sessionStart) / sendOff)
+        for (const pId of (group.participantIds ?? [])) {
+          const p = intervalParticipants[pId]
+          if (!p || p.state === 'done') continue
+          if (p.state === 'resting') {
+            if (p.personalNextStart !== null && t >= p.personalNextStart) {
+              p.repStartedAt = t
+              p.state = 'active'
+              p.personalNextStart = null
+              p.lastGroupCycle = currentCycle
+            } else if (p.personalNextStart === null && currentCycle > p.lastGroupCycle) {
+              p.repStartedAt = sessionStart + currentCycle * sendOff
+              p.state = 'active'
+              p.lastGroupCycle = currentCycle
+            }
+          } else if (p.state === 'active' && currentCycle > p.lastGroupCycle) {
+            p.state = 'overdue'
+            p.lastGroupCycle = currentCycle
+          } else if (p.state === 'overdue' && currentCycle > p.lastGroupCycle) {
+            p.lastGroupCycle = currentCycle
+          }
+        }
+      }
+    })
+  })
+
   $effect(() => {
     writeSession($state.snapshot(session))
   })
 
-  let sessionElapsed = $derived(
-    heatPhase === 'paused' || !sessionTimer.startedAt
-      ? sessionTimer.elapsed
-      : sessionTimer.elapsed + (now - sessionTimer.startedAt)
-  )
-
   let allStopped = $derived(
+    session.mode !== 'interval' &&
     heatPhase !== 'idle' &&
     session.participants.length > 0 &&
     session.participants.every(p => participantTimers[p.id]?.state === 'stopped')
@@ -58,6 +102,7 @@
   let heatHistory = $derived(session.pendingHeats)
 
   let atLeastOneStopped = $derived(
+    session.mode !== 'interval' &&
     heatPhase !== 'idle' &&
     session.participants.some(p => participantTimers[p.id]?.state === 'stopped')
   )
@@ -86,6 +131,25 @@
         participants: $state.snapshot(session.participants),
         heats
       })
+    } else if (session.mode === 'interval') {
+      if (heatPhase === 'idle') return
+      const results = {}
+      for (const p of session.participants) {
+        const itimer = intervalParticipants[p.id]
+        results[p.id] = { reps: $state.snapshot(itimer?.reps ?? []) }
+      }
+      session.archive.push({
+        id: crypto.randomUUID(),
+        type: 'interval',
+        number: session.archive.filter(e => e.type === 'interval').length + 1,
+        timestamp: t,
+        participants: $state.snapshot(session.participants),
+        paceGroups: $state.snapshot(session.intervalConfig?.paceGroups ?? []),
+        overflowBehavior: session.intervalConfig?.overflowBehavior ?? 'reset',
+        overflowBuffer: session.intervalConfig?.overflowBuffer ?? 0,
+        repCount: session.intervalConfig?.repCount ?? null,
+        results
+      })
     } else {
       if (heatPhase === 'idle') return
       const results = {}
@@ -111,7 +175,8 @@
   function setMode(m) {
     if (m === session.mode) return
     if (heatPhase !== 'idle' || session.pendingHeats.length > 0) {
-      if (!confirm(`Switch to ${m === 'heat' ? 'Heat' : 'Lap'} mode? The current session will be saved and reset.`)) return
+      const name = m === 'heat' ? 'Heat' : m === 'lap' ? 'Lap' : 'Interval'
+      if (!confirm(`Switch to ${name} mode? The current session will be saved and reset.`)) return
       commitCurrentState()
     }
     session.pendingHeats = []
@@ -139,18 +204,30 @@
   function resetHeat() {
     heatPhase = 'idle'
     participantTimers = {}
-    sessionTimer = { elapsed: 0, startedAt: null }
+    intervalParticipants = {}
+    intervalSessionStart = null
     if (session.mode === 'lap') session.lapState = null
+    if (session.mode === 'interval') session.intervalState = null
   }
 
   function startAll() {
     const t = Date.now()
-    if (session.mode === 'lap') {
+    if (session.mode === 'interval') {
+      const participants = {}
+      for (const group of (session.intervalConfig?.paceGroups ?? [])) {
+        for (const pId of (group.participantIds ?? [])) {
+          participants[pId] = { state: 'active', repStartedAt: t, reps: [], lastGroupCycle: 0, personalNextStart: null }
+        }
+      }
+      session.intervalState = { phase: 'running', sessionStart: t, participants }
+      intervalParticipants = session.intervalState.participants
+      intervalSessionStart = t
+    } else if (session.mode === 'lap') {
       const participants = {}
       for (const p of session.participants) {
         participants[p.id] = { state: 'running', elapsed: 0, startedAt: t, laps: [] }
       }
-      session.lapState = { phase: 'running', sessionElapsed: 0, sessionStartedAt: t, participants }
+      session.lapState = { phase: 'running', participants }
       participantTimers = session.lapState.participants
     } else {
       const timers = {}
@@ -159,7 +236,6 @@
       }
       participantTimers = timers
     }
-    sessionTimer = { elapsed: 0, startedAt: t }
     heatPhase = 'running'
     now = t
   }
@@ -174,16 +250,6 @@
       timer.laps.push(makeLap(timer.laps, timer.elapsed, null, t))
     }
     timer.state = 'stopped'
-    // freeze session clock when everyone is done
-    const allDone = session.participants.every(p => participantTimers[p.id]?.state === 'stopped')
-    if (allDone && sessionTimer.startedAt) {
-      sessionTimer.elapsed += t - sessionTimer.startedAt
-      sessionTimer.startedAt = null
-      if (session.mode === 'lap' && session.lapState) {
-        session.lapState.sessionElapsed = sessionTimer.elapsed
-        session.lapState.sessionStartedAt = null
-      }
-    }
   }
 
   function recordLap(id) {
@@ -191,6 +257,39 @@
     if (!timer || timer.state !== 'running' || heatPhase !== 'running') return
     const t = Date.now()
     timer.laps.push(makeLap(timer.laps, timer.elapsed, timer.startedAt, t))
+  }
+
+  function recordIntervalRep(id) {
+    const p = intervalParticipants[id]
+    if (!p || (p.state !== 'active' && p.state !== 'overdue') || heatPhase !== 'running') return
+    const t = Date.now()
+    p.reps.push({ number: p.reps.length + 1, elapsed: t - p.repStartedAt })
+
+    const maxReps = session.intervalConfig?.repCount ?? null
+    if (maxReps !== null && p.reps.length >= maxReps) {
+      p.state = 'done'
+      return
+    }
+
+    if (p.state === 'overdue') {
+      const group = (session.intervalConfig?.paceGroups ?? []).find(g => (g.participantIds ?? []).includes(id))
+      const sendOff = group?.sendOff ?? 60000
+      const behavior = session.intervalConfig?.overflowBehavior ?? 'reset'
+      const buffer = session.intervalConfig?.overflowBuffer ?? 0
+      if (behavior === 'rejoin') {
+        p.state = 'resting'
+        p.personalNextStart = null
+      } else if (behavior === 'reset+buffer') {
+        p.state = 'resting'
+        p.personalNextStart = t + sendOff + buffer
+      } else {
+        p.state = 'resting'
+        p.personalNextStart = t + sendOff
+      }
+    } else {
+      p.state = 'resting'
+      p.personalNextStart = null
+    }
   }
 
   function pauseAll() {
@@ -202,13 +301,7 @@
         timer.startedAt = null
       }
     }
-    sessionTimer.elapsed += t - sessionTimer.startedAt
-    sessionTimer.startedAt = null
-    if (session.mode === 'lap' && session.lapState) {
-      session.lapState.phase = 'paused'
-      session.lapState.sessionElapsed = sessionTimer.elapsed
-      session.lapState.sessionStartedAt = null
-    }
+    if (session.mode === 'lap' && session.lapState) session.lapState.phase = 'paused'
     heatPhase = 'paused'
   }
 
@@ -218,11 +311,7 @@
       const timer = participantTimers[id]
       if (timer.state === 'running') timer.startedAt = t
     }
-    sessionTimer.startedAt = t
-    if (session.mode === 'lap' && session.lapState) {
-      session.lapState.phase = 'running'
-      session.lapState.sessionStartedAt = t
-    }
+    if (session.mode === 'lap' && session.lapState) session.lapState.phase = 'running'
     now = t
     heatPhase = 'running'
   }
@@ -268,8 +357,6 @@
   <TopBar
     mode={session.mode}
     onModeChange={setMode}
-    {sessionElapsed}
-    {heatPhase}
   />
   <main>
     <ParticipantList
@@ -278,12 +365,14 @@
       mode={session.mode}
       {heatPhase}
       {participantTimers}
+      {intervalParticipants}
       {now}
       {addParticipant}
       {removeParticipant}
       {reorderParticipants}
       {stopParticipant}
       {recordLap}
+      {recordIntervalRep}
       vibrateOnLap={settings.vibrateOnLap}
     />
   </main>

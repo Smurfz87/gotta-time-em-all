@@ -4,7 +4,7 @@
   import ParticipantCard from './ParticipantCard.svelte'
   import HeatResultsGrid from './HeatResultsGrid.svelte'
 
-  let { participants, history, mode, heatPhase, participantTimers, now, addParticipant, removeParticipant, stopParticipant, recordLap, vibrateOnLap, reorderParticipants } = $props()
+  let { participants, history, mode, heatPhase, participantTimers, intervalParticipants, now, addParticipant, removeParticipant, stopParticipant, recordLap, recordIntervalRep, vibrateOnLap, reorderParticipants } = $props()
 
   let items = $state([...participants])
   $effect(() => { items = [...participants] })
@@ -73,6 +73,7 @@
           {mode}
           {heatPhase}
           timer={participantTimers[p.id] ?? null}
+          intervalTimer={intervalParticipants?.[p.id] ?? null}
           {now}
           expanded={expandedIds[p.id] ?? false}
           flashKey={flashKeys[p.id] ?? 0}
@@ -80,6 +81,7 @@
           onRemove={() => removeParticipant(p.id)}
           onStop={() => stopParticipant(p.id)}
           onLap={() => handleLap(p.id)}
+          onRep={() => recordIntervalRep(p.id)}
         />
       </li>
     {/each}

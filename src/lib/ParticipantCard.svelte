@@ -1,7 +1,7 @@
 <script>
   import { formatElapsed } from './time.js'
 
-  let { participant, mode, heatPhase, timer, now, expanded, flashKey, onToggleExpand, onRemove, onStop, onLap } = $props()
+  let { participant, mode, heatPhase, timer, intervalTimer, now, expanded, flashKey, onToggleExpand, onRemove, onStop, onLap, onRep } = $props()
 
   const AVATAR_COLORS = [
     '#3b82f6', '#8b5cf6', '#ec4899', '#10b981',
@@ -55,7 +55,21 @@
       <span class="name">{participant.name}</span>
     </div>
 
-    {#if inSession}
+    {#if mode === 'interval' && intervalTimer}
+      {#if intervalTimer.state === 'active' || intervalTimer.state === 'overdue'}
+        <span class="elapsed ticking" class:overdue={intervalTimer.state === 'overdue'}>
+          {formatElapsed(now - intervalTimer.repStartedAt)}
+        </span>
+        <span class="rep-count">×{intervalTimer.reps.length}</span>
+        <button class="lap-btn" onclick={onRep} aria-label="Rep {participant.name}">Rep</button>
+      {:else if intervalTimer.state === 'resting'}
+        <span class="rep-count">×{intervalTimer.reps.length}</span>
+        <span class="resting-badge">Resting</span>
+      {:else if intervalTimer.state === 'done'}
+        <span class="rep-count">×{intervalTimer.reps.length}</span>
+        <span class="done-badge" aria-label="Done">✓</span>
+      {/if}
+    {:else if inSession}
       <span class="elapsed" class:ticking={isRunning}>{formatElapsed(elapsed)}</span>
       {#if laps.length > 0}
         <span class="lap-count">×{laps.length}</span>
@@ -194,6 +208,27 @@
 
   .elapsed.ticking {
     color: var(--text);
+  }
+
+  .elapsed.overdue {
+    color: var(--warning, #f59e0b);
+  }
+
+  .rep-count {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent);
+    flex-shrink: 0;
+    min-width: 20px;
+    text-align: right;
+  }
+
+  .resting-badge {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    opacity: 0.6;
   }
 
   .lap-count {

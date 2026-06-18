@@ -14,7 +14,9 @@
     <button class="btn btn-ghost-danger" onclick={clearRoster}>Clear roster</button>
 
   {:else if heatPhase === 'running'}
-    {#if allStopped}
+    {#if mode === 'interval'}
+      <button class="btn btn-secondary btn-full" onclick={newSession}>New session</button>
+    {:else if allStopped}
       {#if mode === 'heat'}
         <button class="btn btn-primary" onclick={newHeat}>New Heat</button>
       {/if}
