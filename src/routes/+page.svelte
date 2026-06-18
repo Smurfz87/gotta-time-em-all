@@ -1,6 +1,7 @@
 <script>
   import TopBar from '$lib/TopBar.svelte'
   import ParticipantList from '$lib/ParticipantList.svelte'
+  import IntervalSetup from '$lib/IntervalSetup.svelte'
   import BottomControls from '$lib/BottomControls.svelte'
   import { readSession, writeSession, readSettings } from '$lib/storage.js'
   import { getInitials } from '$lib/utils.js'
@@ -101,6 +102,16 @@
 
   let heatHistory = $derived(session.pendingHeats)
 
+  let canStart = $derived(
+    session.mode === 'interval'
+      ? session.participants.length > 0 &&
+        session.intervalConfig.paceGroups.length > 0 &&
+        session.participants.every(p =>
+          session.intervalConfig.paceGroups.some(g => g.participantIds.includes(p.id))
+        )
+      : session.participants.length > 0
+  )
+
   let atLeastOneStopped = $derived(
     session.mode !== 'interval' &&
     heatPhase !== 'idle' &&
@@ -199,6 +210,9 @@
     if (heatPhase !== 'idle') return
     session.participants = session.participants.filter(p => p.id !== id)
     delete participantTimers[id]
+    for (const group of session.intervalConfig?.paceGroups ?? []) {
+      group.participantIds = group.participantIds.filter(pId => pId !== id)
+    }
   }
 
   function resetHeat() {
@@ -350,6 +364,9 @@
     session.archive = []
     session.pendingHeats = []
     session.sessionArchiveStart = 0
+    for (const group of session.intervalConfig?.paceGroups ?? []) {
+      group.participantIds = []
+    }
   }
 </script>
 
@@ -359,27 +376,35 @@
     onModeChange={setMode}
   />
   <main>
-    <ParticipantList
-      participants={session.participants}
-      history={heatHistory}
-      mode={session.mode}
-      {heatPhase}
-      {participantTimers}
-      {intervalParticipants}
-      {now}
-      {addParticipant}
-      {removeParticipant}
-      {reorderParticipants}
-      {stopParticipant}
-      {recordLap}
-      {recordIntervalRep}
-      vibrateOnLap={settings.vibrateOnLap}
-    />
+    {#if session.mode === 'interval' && heatPhase === 'idle'}
+      <IntervalSetup
+        intervalConfig={session.intervalConfig}
+        participants={session.participants}
+        {addParticipant}
+      />
+    {:else}
+      <ParticipantList
+        participants={session.participants}
+        history={heatHistory}
+        mode={session.mode}
+        {heatPhase}
+        {participantTimers}
+        {intervalParticipants}
+        {now}
+        {addParticipant}
+        {removeParticipant}
+        {reorderParticipants}
+        {stopParticipant}
+        {recordLap}
+        {recordIntervalRep}
+        vibrateOnLap={settings.vibrateOnLap}
+      />
+    {/if}
   </main>
   <BottomControls
     mode={session.mode}
     {heatPhase}
-    hasParticipants={session.participants.length > 0}
+    {canStart}
     {allStopped}
     {atLeastOneStopped}
     {startAll}

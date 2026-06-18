@@ -1,13 +1,13 @@
 <script>
   let {
-    mode, heatPhase, hasParticipants, allStopped, atLeastOneStopped,
+    mode, heatPhase, canStart, allStopped, atLeastOneStopped,
     startAll, pauseAll, resumeAll, newHeat, newSession, clearRoster
   } = $props()
 </script>
 
 <div class="controls">
   {#if heatPhase === 'idle'}
-    <button class="btn btn-primary" disabled={!hasParticipants} onclick={startAll}>
+    <button class="btn btn-primary" disabled={!canStart} onclick={startAll}>
       Start all
     </button>
     <button class="btn btn-secondary" onclick={newSession}>New session</button>
