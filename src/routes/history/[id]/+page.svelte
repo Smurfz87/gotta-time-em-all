@@ -63,7 +63,7 @@
 </script>
 
 <PageShell
-  title={entry ? `${entry.type === 'heat' ? 'Heat Session' : entry.type === 'interval' ? 'Interval Session' : 'Run'} ${entry.number}` : 'Entry'}
+  title={entry ? `${entry.type === 'heat' ? 'Heat' : entry.type === 'interval' ? 'Interval' : 'Run'} ${entry.number}` : 'Entry'}
   backHref="/history"
   backLabel="Back to history"
 >

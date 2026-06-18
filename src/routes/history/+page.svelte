@@ -82,8 +82,8 @@
   }
 
   function entryTitle(entry) {
-    if (entry.type === 'heat') return `Heat Session ${entry.number}`
-    if (entry.type === 'interval') return `Interval Session ${entry.number}`
+    if (entry.type === 'heat') return `Heat ${entry.number}`
+    if (entry.type === 'interval') return `Interval ${entry.number}`
     return `Run ${entry.number}`
   }
 
