@@ -80,6 +80,25 @@
   function heatCount(entry) {
     return (entry.heats ?? [entry]).length
   }
+
+  function entryTitle(entry) {
+    if (entry.type === 'heat') return `Heat Session ${entry.number}`
+    if (entry.type === 'interval') return `Interval Session ${entry.number}`
+    return `Run ${entry.number}`
+  }
+
+  function entrySub(entry) {
+    if (entry.type === 'heat') {
+      const n = heatCount(entry)
+      return `${n} heat${n !== 1 ? 's' : ''}`
+    }
+    if (entry.type === 'interval') {
+      const groups = (entry.paceGroups ?? []).length
+      const reps = entry.repCount ?? '∞'
+      return `${groups} group${groups !== 1 ? 's' : ''} · ${reps} reps`
+    }
+    return null
+  }
 </script>
 
 <PageShell title="History" backLabel="Back to timer">
@@ -121,17 +140,12 @@
         <li>
           <a href="{base}/history/{entry.id}" class="entry-row">
             <div class="entry-info">
-              <span class="entry-num">
-                {entry.type === 'heat' ? 'Heat Session' : 'Run'} {entry.number}
-              </span>
-              {#if entry.type === 'heat'}
-                {@const n = heatCount(entry)}
-                <span class="entry-sub">{n} heat{n !== 1 ? 's' : ''}</span>
-              {/if}
+              <span class="entry-num">{entryTitle(entry)}</span>
+              {#if entrySub(entry)}<span class="entry-sub">{entrySub(entry)}</span>{/if}
             </div>
             <span class="entry-time">{formatDateTime(entry.timestamp)}</span>
-            <span class="entry-badge" class:heat={entry.type === 'heat'} class:run={entry.type === 'run'}>
-              {entry.type === 'heat' ? 'Heat' : 'Run'}
+            <span class="entry-badge" class:heat={entry.type === 'heat'} class:run={entry.type === 'run'} class:interval={entry.type === 'interval'}>
+              {entry.type === 'heat' ? 'Heat' : entry.type === 'interval' ? 'Interval' : 'Run'}
             </span>
             <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="9 18 15 12 9 6"/>
@@ -258,6 +272,11 @@
   .entry-badge.run {
     background: color-mix(in srgb, var(--running) 15%, transparent);
     color: var(--running);
+  }
+
+  .entry-badge.interval {
+    background: color-mix(in srgb, var(--warning) 15%, transparent);
+    color: var(--warning);
   }
 
   .chevron {

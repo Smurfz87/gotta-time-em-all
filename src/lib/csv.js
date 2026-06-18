@@ -31,6 +31,23 @@ export function buildHeatCsv(entry) {
   return [header, ...rows].join('\n')
 }
 
+export function buildIntervalCsv(entry) {
+  const lines = ['Group,Participant,Rep,Time,Status']
+  for (const group of entry.paceGroups ?? []) {
+    const sendOff = group.sendOff ?? 60000
+    for (const pId of group.participantIds ?? []) {
+      const p = (entry.participants ?? []).find(pp => pp.id === pId)
+      if (!p) continue
+      const reps = entry.results?.[pId]?.reps ?? []
+      for (const rep of reps) {
+        const status = rep.elapsed > sendOff ? 'Overdue' : 'OK'
+        lines.push(`${group.name},${p.name},${rep.number},${formatElapsed(rep.elapsed)},${status}`)
+      }
+    }
+  }
+  return lines.join('\n')
+}
+
 export function buildRunCsv(entry) {
   const lines = ['Participant,Lap,Gap,Cumulative']
   for (const p of entry.participants ?? []) {

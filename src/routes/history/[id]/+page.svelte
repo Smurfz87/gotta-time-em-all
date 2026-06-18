@@ -1,9 +1,9 @@
 <script>
   import { base } from '$app/paths'
   import { goto } from '$app/navigation'
-  import { formatElapsed } from '$lib/time.js'
+  import { formatElapsed, formatDuration } from '$lib/time.js'
   import { readSession, writeSession } from '$lib/storage.js'
-  import { buildHeatCsv, buildRunCsv } from '$lib/csv.js'
+  import { buildHeatCsv, buildRunCsv, buildIntervalCsv } from '$lib/csv.js'
   import PageShell from '$lib/PageShell.svelte'
 
   let { data } = $props()
@@ -14,7 +14,10 @@
   function exportCsv() {
     if (!entry) return
     const date = new Date(entry.timestamp).toISOString().slice(0, 10)
-    const csv = entry.type === 'heat' ? buildHeatCsv(entry) : buildRunCsv(entry)
+    let csv
+    if (entry.type === 'heat') csv = buildHeatCsv(entry)
+    else if (entry.type === 'interval') csv = buildIntervalCsv(entry)
+    else csv = buildRunCsv(entry)
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -60,7 +63,7 @@
 </script>
 
 <PageShell
-  title={entry ? `${entry.type === 'heat' ? 'Heat Session' : 'Run'} ${entry.number}` : 'Entry'}
+  title={entry ? `${entry.type === 'heat' ? 'Heat Session' : entry.type === 'interval' ? 'Interval Session' : 'Run'} ${entry.number}` : 'Entry'}
   backHref="/history"
   backLabel="Back to history"
 >
@@ -90,6 +93,65 @@
             {/each}
           </tbody>
         </table>
+      </div>
+
+    {:else if entry.type === 'interval'}
+      <div class="interval-session">
+        {#each entry.paceGroups ?? [] as group (group.id)}
+          {@const groupParticipants = (group.participantIds ?? [])
+            .map(id => entry.participants.find(p => p.id === id))
+            .filter(Boolean)}
+          {@const repLists = groupParticipants.map(p => entry.results?.[p.id]?.reps ?? [])}
+          {@const maxReps = Math.max(0, ...repLists.map(r => r.length))}
+
+          <div class="group-block">
+            <div class="int-group-header">
+              <span class="int-group-name">{group.name}</span>
+              <span class="int-group-sendoff">{formatDuration(group.sendOff)}</span>
+            </div>
+
+            {#if maxReps > 0}
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th class="col-rep"></th>
+                      {#each groupParticipants as p (p.id)}
+                        <th>{p.name}</th>
+                      {/each}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {#each Array.from({length: maxReps}, (_, i) => i) as repIdx}
+                      <tr>
+                        <td class="col-rep">Rep {repIdx + 1}</td>
+                        {#each repLists as pReps}
+                          {@const rep = pReps[repIdx]}
+                          {#if rep}
+                            <td class:overdue-rep={rep.elapsed > group.sendOff}>{formatElapsed(rep.elapsed)}</td>
+                          {:else}
+                            <td class="dnf">—</td>
+                          {/if}
+                        {/each}
+                      </tr>
+                    {/each}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td class="col-rep footer-label">Avg</td>
+                      {#each repLists as pReps}
+                        {@const avg = pReps.length > 0 ? pReps.reduce((s, r) => s + r.elapsed, 0) / pReps.length : null}
+                        <td class="footer-val">{avg != null ? formatElapsed(avg) : '—'}</td>
+                      {/each}
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            {:else}
+              <p class="no-reps">No reps recorded</p>
+            {/if}
+          </div>
+        {/each}
       </div>
 
     {:else}
@@ -190,6 +252,75 @@
   }
 
   td.dnf { color: var(--text-muted); }
+
+  /* Interval session */
+  .interval-session {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .group-block {
+    background: var(--surface);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  .int-group-header {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    background: color-mix(in srgb, var(--surface) 60%, var(--bg) 40%);
+  }
+
+  .int-group-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .int-group-sendoff {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .overdue-rep {
+    color: var(--warning);
+    font-style: italic;
+  }
+
+  .footer-label {
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .footer-val {
+    font-weight: 600;
+  }
+
+  tfoot tr td {
+    border-top: 1px solid var(--border);
+    border-bottom: none;
+    background: color-mix(in srgb, var(--surface) 60%, var(--bg) 40%);
+  }
+
+  .no-reps {
+    padding: 10px 14px;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
 
   /* Run cards */
   .runs {

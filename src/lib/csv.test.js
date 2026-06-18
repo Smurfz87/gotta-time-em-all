@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildHeatCsv, buildRunCsv } from './csv.js'
+import { buildHeatCsv, buildRunCsv, buildIntervalCsv } from './csv.js'
 
 const alice = { id: 'a', name: 'Alice' }
 const bob   = { id: 'b', name: 'Bob' }
@@ -145,5 +145,61 @@ describe('buildRunCsv', () => {
     const lines = buildRunCsv(entry).split('\n')
     expect(lines).toHaveLength(2) // header + total
     expect(lines[1]).toBe('Alice,Total,,00:05.00')
+  })
+})
+
+describe('buildIntervalCsv', () => {
+  const g1 = { id: 'g1', name: 'Group 1', sendOff: 90000, participantIds: ['a'] }
+  const g2 = { id: 'g2', name: 'Group 2', sendOff: 60000, participantIds: ['b'] }
+
+  it('produces correct header', () => {
+    const entry = { participants: [], paceGroups: [], results: {} }
+    expect(buildIntervalCsv(entry)).toBe('Group,Participant,Rep,Time,Status')
+  })
+
+  it('marks rep OK when elapsed within send-off', () => {
+    const entry = {
+      participants: [alice],
+      paceGroups: [g1],
+      results: { a: { reps: [{ number: 1, elapsed: 85000 }] } }
+    }
+    const lines = buildIntervalCsv(entry).split('\n')
+    expect(lines[1]).toMatch(/,OK$/)
+  })
+
+  it('marks rep Overdue when elapsed exceeds send-off', () => {
+    const entry = {
+      participants: [alice],
+      paceGroups: [g1],
+      results: { a: { reps: [{ number: 1, elapsed: 95000 }] } }
+    }
+    const lines = buildIntervalCsv(entry).split('\n')
+    expect(lines[1]).toMatch(/,Overdue$/)
+  })
+
+  it('produces one row per rep across groups', () => {
+    const entry = {
+      participants: [alice, bob],
+      paceGroups: [g1, g2],
+      results: {
+        a: { reps: [{ number: 1, elapsed: 85000 }, { number: 2, elapsed: 88000 }] },
+        b: { reps: [{ number: 1, elapsed: 55000 }] }
+      }
+    }
+    const lines = buildIntervalCsv(entry).split('\n')
+    expect(lines).toHaveLength(4) // header + 2 alice reps + 1 bob rep
+    expect(lines[1]).toMatch(/^Group 1,Alice,1,/)
+    expect(lines[2]).toMatch(/^Group 1,Alice,2,/)
+    expect(lines[3]).toMatch(/^Group 2,Bob,1,/)
+  })
+
+  it('skips participants not in results', () => {
+    const entry = {
+      participants: [alice],
+      paceGroups: [g1],
+      results: {}
+    }
+    const lines = buildIntervalCsv(entry).split('\n')
+    expect(lines).toHaveLength(1) // header only
   })
 })
