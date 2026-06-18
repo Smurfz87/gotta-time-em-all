@@ -7,9 +7,12 @@ import {
   applyRecordLap,
   applyRecordIntervalRep,
   advanceIntervalCycles,
+  applyRecordRestRep,
+  advanceRestTimers,
   buildHeatCommitEntry,
   buildIntervalCommitEntry,
-  buildRunCommitEntry
+  buildRunCommitEntry,
+  buildRestCommitEntry
 } from './sessionLogic.js'
 
 const alice = { id: 'a', name: 'Alice', initials: 'A' }
@@ -427,5 +430,164 @@ describe('buildRunCommitEntry', () => {
   it('handles participant with no timer', () => {
     const entry = buildRunCommitEntry([alice], {}, 'running', [], 0)
     expect(entry.results.a).toEqual({ laps: [], elapsed: 0 })
+  })
+})
+
+// ─── Rest mode: defaultSession ────────────────────────────────────────────────
+
+describe('defaultSession — rest fields', () => {
+  it('includes restConfig with 30s rest and open-ended repCount', () => {
+    const s = defaultSession()
+    expect(s.restConfig).toEqual({ restDuration: 30000, repCount: null })
+    expect(s.restState).toBeNull()
+  })
+})
+
+// ─── restoreSessionState — rest mode ─────────────────────────────────────────
+
+describe('restoreSessionState — rest mode', () => {
+  it('restores a running rest session', () => {
+    const participants = { a: { state: 'effort', repStartedAt: 1000, restEndsAt: null, reps: [] } }
+    const session = { ...defaultSession(), restState: { phase: 'running', participants } }
+    const result = restoreSessionState(session)
+    expect(result.heatPhase).toBe('running')
+    expect(result.restParticipants).toBe(participants)
+    expect(result.participantTimers).toEqual({})
+    expect(result.intervalParticipants).toEqual({})
+  })
+
+  it('returns empty restParticipants for non-rest sessions', () => {
+    const result = restoreSessionState(defaultSession())
+    expect(result.restParticipants).toEqual({})
+  })
+})
+
+// ─── buildStartTimers — rest mode ────────────────────────────────────────────
+
+describe('buildStartTimers — rest mode', () => {
+  it('initialises all participants in effort state', () => {
+    const result = buildStartTimers('rest', [alice, bob], null, 5000)
+    expect(result.restParticipants.a).toEqual({ state: 'effort', repStartedAt: 5000, restEndsAt: null, reps: [] })
+    expect(result.restParticipants.b).toEqual({ state: 'effort', repStartedAt: 5000, restEndsAt: null, reps: [] })
+    expect(result.participantTimers).toEqual({})
+    expect(result.intervalParticipants).toEqual({})
+  })
+})
+
+// ─── applyRecordRestRep ───────────────────────────────────────────────────────
+
+describe('applyRecordRestRep', () => {
+  const restConfig = { restDuration: 30000, repCount: null }
+
+  it('records a rep and transitions to resting', () => {
+    const rp = { a: { state: 'effort', repStartedAt: 1000, restEndsAt: null, reps: [] } }
+    applyRecordRestRep('a', rp, restConfig, 'running', 5000)
+    expect(rp.a.reps).toEqual([{ number: 1, elapsed: 4000 }])
+    expect(rp.a.state).toBe('resting')
+    expect(rp.a.restEndsAt).toBe(35000)
+  })
+
+  it('transitions to done when repCount reached', () => {
+    const rp = { a: { state: 'effort', repStartedAt: 1000, restEndsAt: null, reps: [{ number: 1, elapsed: 3000 }] } }
+    applyRecordRestRep('a', rp, { restDuration: 30000, repCount: 2 }, 'running', 5000)
+    expect(rp.a.state).toBe('done')
+    expect(rp.a.reps).toHaveLength(2)
+    expect(rp.a.restEndsAt).toBeNull()
+  })
+
+  it('is a no-op when participant is resting', () => {
+    const rp = { a: { state: 'resting', repStartedAt: 1000, restEndsAt: 31000, reps: [] } }
+    applyRecordRestRep('a', rp, restConfig, 'running', 5000)
+    expect(rp.a.state).toBe('resting')
+    expect(rp.a.reps).toHaveLength(0)
+  })
+
+  it('is a no-op when heatPhase is not running', () => {
+    const rp = { a: { state: 'effort', repStartedAt: 1000, restEndsAt: null, reps: [] } }
+    applyRecordRestRep('a', rp, restConfig, 'paused', 5000)
+    expect(rp.a.reps).toHaveLength(0)
+  })
+
+  it('uses default restDuration when restConfig is null', () => {
+    const rp = { a: { state: 'effort', repStartedAt: 1000, restEndsAt: null, reps: [] } }
+    applyRecordRestRep('a', rp, null, 'running', 5000)
+    expect(rp.a.restEndsAt).toBe(35000)
+  })
+})
+
+// ─── advanceRestTimers ────────────────────────────────────────────────────────
+
+describe('advanceRestTimers', () => {
+  const restConfig = { restDuration: 30000, repCount: null }
+
+  it('transitions resting → effort when restEndsAt is reached', () => {
+    const rp = { a: { state: 'resting', repStartedAt: 1000, restEndsAt: 5000, reps: [{ number: 1, elapsed: 4000 }] } }
+    advanceRestTimers(rp, restConfig, 5001)
+    expect(rp.a.state).toBe('effort')
+    expect(rp.a.repStartedAt).toBe(5000)  // exact boundary, not tick time
+    expect(rp.a.restEndsAt).toBeNull()
+  })
+
+  it('is a no-op when rest period has not elapsed', () => {
+    const rp = { a: { state: 'resting', repStartedAt: 1000, restEndsAt: 5000, reps: [] } }
+    advanceRestTimers(rp, restConfig, 4999)
+    expect(rp.a.state).toBe('resting')
+  })
+
+  it('is a no-op when participant is in effort state', () => {
+    const rp = { a: { state: 'effort', repStartedAt: 1000, restEndsAt: null, reps: [] } }
+    advanceRestTimers(rp, restConfig, 99999)
+    expect(rp.a.state).toBe('effort')
+  })
+
+  it('transitions to done when repCount reached on rest expiry', () => {
+    const rp = { a: { state: 'resting', repStartedAt: 1000, restEndsAt: 5000, reps: [{ number: 1, elapsed: 4000 }, { number: 2, elapsed: 3000 }] } }
+    advanceRestTimers(rp, { restDuration: 30000, repCount: 2 }, 5001)
+    expect(rp.a.state).toBe('done')
+  })
+
+  it('advances multiple participants independently', () => {
+    const rp = {
+      a: { state: 'resting', repStartedAt: 1000, restEndsAt: 4000, reps: [{ number: 1, elapsed: 3000 }] },
+      b: { state: 'resting', repStartedAt: 2000, restEndsAt: 6000, reps: [{ number: 1, elapsed: 4000 }] }
+    }
+    advanceRestTimers(rp, restConfig, 5000)
+    expect(rp.a.state).toBe('effort')  // restEndsAt 4000 passed
+    expect(rp.b.state).toBe('resting') // restEndsAt 6000 not yet
+  })
+})
+
+// ─── buildRestCommitEntry ─────────────────────────────────────────────────────
+
+describe('buildRestCommitEntry', () => {
+  const restConfig = { restDuration: 30000, repCount: 3 }
+
+  it('returns null when heatPhase is idle', () => {
+    const rp = { a: { state: 'effort', repStartedAt: 1000, restEndsAt: null, reps: [] } }
+    expect(buildRestCommitEntry([alice], rp, restConfig, 'idle', [], 5000)).toBeNull()
+  })
+
+  it('builds an archive entry with type rest', () => {
+    const rp = { a: { state: 'done', repStartedAt: 1000, restEndsAt: null, reps: [{ number: 1, elapsed: 4000 }, { number: 2, elapsed: 3500 }] } }
+    const entry = buildRestCommitEntry([alice], rp, restConfig, 'running', [], 10000)
+    expect(entry.type).toBe('rest')
+    expect(entry.number).toBe(1)
+    expect(entry.restDuration).toBe(30000)
+    expect(entry.repCount).toBe(3)
+    expect(entry.results.a.reps).toHaveLength(2)
+    expect(entry.participants).toEqual([alice])
+  })
+
+  it('increments number based on prior rest entries in archive', () => {
+    const archive = [{ type: 'rest' }, { type: 'rest' }, { type: 'run' }]
+    const rp = { a: { state: 'effort', repStartedAt: 1000, restEndsAt: null, reps: [] } }
+    const entry = buildRestCommitEntry([alice], rp, restConfig, 'running', archive, 5000)
+    expect(entry.number).toBe(3)
+  })
+
+  it('defaults to empty reps for participants with no entry', () => {
+    const entry = buildRestCommitEntry([alice, bob], {}, restConfig, 'running', [], 5000)
+    expect(entry.results.a.reps).toEqual([])
+    expect(entry.results.b.reps).toEqual([])
   })
 })

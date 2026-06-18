@@ -9,9 +9,12 @@ import {
   applyRecordLap,
   applyRecordIntervalRep,
   advanceIntervalCycles,
+  applyRecordRestRep,
+  advanceRestTimers,
   buildHeatCommitEntry,
   buildIntervalCommitEntry,
-  buildRunCommitEntry
+  buildRunCommitEntry,
+  buildRestCommitEntry
 } from './sessionLogic.js'
 
 export function createSession() {
@@ -19,6 +22,7 @@ export function createSession() {
   let heatPhase = $state('idle')
   let participantTimers = $state({})
   let intervalParticipants = $state({})
+  let restParticipants = $state({})
   let intervalSessionStart = $state(null)
   let now = $state(Date.now())
 
@@ -28,6 +32,7 @@ export function createSession() {
   heatPhase = restored.heatPhase
   participantTimers = restored.participantTimers
   intervalParticipants = restored.intervalParticipants
+  restParticipants = restored.restParticipants
   intervalSessionStart = restored.intervalSessionStart
 
   let allStopped = $derived(
@@ -42,6 +47,13 @@ export function createSession() {
     heatPhase === 'running' &&
     session.participants.length > 0 &&
     session.participants.every(p => intervalParticipants[p.id]?.state === 'done')
+  )
+
+  let allRestDone = $derived(
+    session.mode === 'rest' &&
+    heatPhase === 'running' &&
+    session.participants.length > 0 &&
+    session.participants.every(p => restParticipants[p.id]?.state === 'done')
   )
 
   let heatHistory = $derived(session.pendingHeats)
@@ -63,7 +75,7 @@ export function createSession() {
   )
 
   $effect(() => {
-    if (heatPhase !== 'running' || allStopped || allIntervalDone) return
+    if (heatPhase !== 'running' || allStopped || allIntervalDone || allRestDone) return
     const id = setInterval(() => { now = Date.now() }, 50)
     return () => clearInterval(id)
   })
@@ -75,6 +87,15 @@ export function createSession() {
     const t = now
     untrack(() => {
       advanceIntervalCycles(intervalParticipants, session.intervalConfig?.paceGroups ?? [], intervalSessionStart, t)
+    })
+  })
+
+  // Same pattern for rest mode: reads `now`, mutates `restParticipants` untracked.
+  $effect(() => {
+    if (session.mode !== 'rest' || heatPhase !== 'running') return
+    const t = now
+    untrack(() => {
+      advanceRestTimers(restParticipants, session.restConfig, t)
     })
   })
 
@@ -103,6 +124,15 @@ export function createSession() {
         $state.snapshot(session.archive),
         t
       )
+    } else if (session.mode === 'rest') {
+      entry = buildRestCommitEntry(
+        $state.snapshot(session.participants),
+        $state.snapshot(restParticipants),
+        $state.snapshot(session.restConfig),
+        heatPhase,
+        $state.snapshot(session.archive),
+        t
+      )
     } else {
       entry = buildRunCommitEntry(
         $state.snapshot(session.participants),
@@ -119,15 +149,17 @@ export function createSession() {
     heatPhase = 'idle'
     participantTimers = {}
     intervalParticipants = {}
+    restParticipants = {}
     intervalSessionStart = null
     if (session.mode === 'lap') session.lapState = null
     if (session.mode === 'interval') session.intervalState = null
+    if (session.mode === 'rest') session.restState = null
   }
 
   function setMode(m) {
     if (m === session.mode) return
     if (heatPhase !== 'idle' || session.pendingHeats.length > 0) {
-      const name = m === 'heat' ? 'Heat' : m === 'lap' ? 'Lap' : 'Interval'
+      const name = m === 'heat' ? 'Heat' : m === 'lap' ? 'Lap' : m === 'rest' ? 'Rest' : 'Interval'
       if (!confirm(`Switch to ${name} mode? The current session will be saved and reset.`)) return
       commitCurrentState()
     }
@@ -159,6 +191,9 @@ export function createSession() {
       session.intervalState = { phase: 'running', sessionStart: t, participants: result.intervalParticipants }
       intervalParticipants = session.intervalState.participants
       intervalSessionStart = t
+    } else if (session.mode === 'rest') {
+      session.restState = { phase: 'running', participants: result.restParticipants }
+      restParticipants = session.restState.participants
     } else if (session.mode === 'lap') {
       session.lapState = { phase: 'running', participants: result.participantTimers }
       participantTimers = session.lapState.participants
@@ -179,6 +214,10 @@ export function createSession() {
 
   function recordIntervalRep(id) {
     applyRecordIntervalRep(id, intervalParticipants, intervalSessionStart, session.intervalConfig, heatPhase, Date.now())
+  }
+
+  function recordRestRep(id) {
+    applyRecordRestRep(id, restParticipants, session.restConfig, heatPhase, Date.now())
   }
 
   function pauseAll() {
@@ -248,9 +287,11 @@ export function createSession() {
     get now() { return now },
     get allStopped() { return allStopped },
     get allIntervalDone() { return allIntervalDone },
+    get allRestDone() { return allRestDone },
     get heatHistory() { return heatHistory },
     get canStart() { return canStart },
     get atLeastOneStopped() { return atLeastOneStopped },
+    get restParticipants() { return restParticipants },
     setMode,
     addParticipant,
     removeParticipant,
@@ -258,6 +299,7 @@ export function createSession() {
     stopParticipant,
     recordLap,
     recordIntervalRep,
+    recordRestRep,
     pauseAll,
     resumeAll,
     newHeat,

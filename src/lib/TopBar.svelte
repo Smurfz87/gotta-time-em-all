@@ -21,6 +21,11 @@
       class:active={mode === 'interval'}
       onclick={() => onModeChange('interval')}
     >Interval</button>
+    <button
+      class="toggle-btn"
+      class:active={mode === 'rest'}
+      onclick={() => onModeChange('rest')}
+    >Rest</button>
   </div>
   <div class="nav-icons">
     <a href="{base}/history" class="icon-link" aria-label="History">

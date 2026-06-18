@@ -9,6 +9,8 @@ export function defaultSession() {
     lapState: null,
     intervalState: null,
     intervalConfig: { repCount: null, overflowBehavior: 'reset', overflowBuffer: 30000, paceGroups: [] },
+    restState: null,
+    restConfig: { restDuration: 30000, repCount: null },
     pendingHeats: []
   }
 }
@@ -19,6 +21,7 @@ export function restoreSessionState(session) {
       heatPhase: session.lapState.phase,
       participantTimers: session.lapState.participants ?? {},
       intervalParticipants: {},
+      restParticipants: {},
       intervalSessionStart: null
     }
   }
@@ -27,10 +30,20 @@ export function restoreSessionState(session) {
       heatPhase: 'running',
       participantTimers: {},
       intervalParticipants: session.intervalState.participants ?? {},
+      restParticipants: {},
       intervalSessionStart: session.intervalState.sessionStart ?? null
     }
   }
-  return { heatPhase: 'idle', participantTimers: {}, intervalParticipants: {}, intervalSessionStart: null }
+  if (session.restState?.phase === 'running') {
+    return {
+      heatPhase: 'running',
+      participantTimers: {},
+      intervalParticipants: {},
+      restParticipants: session.restState.participants ?? {},
+      intervalSessionStart: null
+    }
+  }
+  return { heatPhase: 'idle', participantTimers: {}, intervalParticipants: {}, restParticipants: {}, intervalSessionStart: null }
 }
 
 export function buildStartTimers(mode, participants, intervalConfig, t) {
@@ -41,7 +54,14 @@ export function buildStartTimers(mode, participants, intervalConfig, t) {
         intervalParticipants[pId] = { state: 'active', repStartedAt: t, reps: [], lastGroupCycle: 0, personalOverdueAt: null }
       }
     }
-    return { participantTimers: {}, intervalParticipants, intervalSessionStart: t }
+    return { participantTimers: {}, intervalParticipants, restParticipants: {}, intervalSessionStart: t }
+  }
+  if (mode === 'rest') {
+    const restParticipants = {}
+    for (const p of participants) {
+      restParticipants[p.id] = { state: 'effort', repStartedAt: t, restEndsAt: null, reps: [] }
+    }
+    return { participantTimers: {}, intervalParticipants: {}, restParticipants, intervalSessionStart: null }
   }
   const timers = {}
   for (const p of participants) {
@@ -49,7 +69,7 @@ export function buildStartTimers(mode, participants, intervalConfig, t) {
       ? { state: 'running', elapsed: 0, startedAt: t, laps: [] }
       : { state: 'running', elapsed: 0, startedAt: t }
   }
-  return { participantTimers: timers, intervalParticipants: {}, intervalSessionStart: null }
+  return { participantTimers: timers, intervalParticipants: {}, restParticipants: {}, intervalSessionStart: null }
 }
 
 export function applyStopParticipant(id, mode, participantTimers, t) {
@@ -184,6 +204,57 @@ export function buildIntervalCommitEntry(participants, intervalParticipants, int
     overflowBehavior: intervalConfig?.overflowBehavior ?? 'reset',
     overflowBuffer: intervalConfig?.overflowBuffer ?? 0,
     repCount: intervalConfig?.repCount ?? null,
+    results
+  }
+}
+
+export function applyRecordRestRep(id, restParticipants, restConfig, heatPhase, t) {
+  const p = restParticipants[id]
+  if (!p || p.state !== 'effort' || heatPhase !== 'running') return
+  p.reps.push({ number: p.reps.length + 1, elapsed: t - p.repStartedAt })
+
+  const maxReps = restConfig?.repCount ?? null
+  if (maxReps !== null && p.reps.length >= maxReps) {
+    p.state = 'done'
+    return
+  }
+
+  p.state = 'resting'
+  p.restEndsAt = t + (restConfig?.restDuration ?? 30000)
+}
+
+// Advance rest participant states as rest countdowns expire.
+// Mutates restParticipants in place — call inside untrack() to avoid reactive cycles.
+export function advanceRestTimers(restParticipants, restConfig, t) {
+  const maxReps = restConfig?.repCount ?? null
+  for (const pId in restParticipants) {
+    const p = restParticipants[pId]
+    if (p.state !== 'resting' || !p.restEndsAt || t < p.restEndsAt) continue
+    if (maxReps !== null && p.reps.length >= maxReps) {
+      p.state = 'done'
+    } else {
+      // Use restEndsAt as the new repStartedAt for precise elapsed tracking
+      p.repStartedAt = p.restEndsAt
+      p.restEndsAt = null
+      p.state = 'effort'
+    }
+  }
+}
+
+export function buildRestCommitEntry(participants, restParticipants, restConfig, heatPhase, archive, t) {
+  if (heatPhase === 'idle') return null
+  const results = {}
+  for (const p of participants) {
+    results[p.id] = { reps: restParticipants[p.id]?.reps ?? [] }
+  }
+  return {
+    id: crypto.randomUUID(),
+    type: 'rest',
+    number: archive.filter(e => e.type === 'rest').length + 1,
+    timestamp: t,
+    participants,
+    restDuration: restConfig?.restDuration ?? 30000,
+    repCount: restConfig?.repCount ?? null,
     results
   }
 }

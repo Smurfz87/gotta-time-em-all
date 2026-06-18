@@ -34,6 +34,23 @@
           recordIntervalRep={s.recordIntervalRep}
         />
       {/if}
+    {:else if s.session.mode === 'rest' && s.heatPhase !== 'idle'}
+      <!-- RestSession.svelte added in #32 -->
+      <div class="rest-placeholder">
+        <p>Rest session running — full UI coming in #32</p>
+        <ul>
+          {#each s.session.participants as p (p.id)}
+            {@const rp = s.restParticipants[p.id]}
+            <li>
+              {p.name}: {rp?.state ?? '?'}
+              ({rp?.reps?.length ?? 0} reps)
+              {#if rp?.state === 'effort'}
+                <button onclick={() => s.recordRestRep(p.id)}>Rep</button>
+              {/if}
+            </li>
+          {/each}
+        </ul>
+      </div>
     {:else}
       <ParticipantList
         participants={s.session.participants}
@@ -56,6 +73,7 @@
     heatPhase={s.heatPhase}
     canStart={s.canStart}
     allStopped={s.allStopped}
+    allRestDone={s.allRestDone}
     atLeastOneStopped={s.atLeastOneStopped}
     startAll={s.startAll}
     pauseAll={s.pauseAll}
@@ -87,5 +105,27 @@
       border-left: 1px solid var(--border);
       border-right: 1px solid var(--border);
     }
+  }
+
+  .rest-placeholder {
+    padding: 24px 16px;
+    color: var(--text-muted);
+    font-size: 14px;
+  }
+
+  .rest-placeholder ul {
+    margin-top: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    list-style: none;
+    padding: 0;
+  }
+
+  .rest-placeholder li {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    color: var(--text);
   }
 </style>
