@@ -3,7 +3,7 @@
   import { goto } from '$app/navigation'
   import { formatElapsed, formatDuration } from '$lib/time.js'
   import { readSession, writeSession } from '$lib/storage.js'
-  import { buildHeatCsv, buildRunCsv, buildIntervalCsv } from '$lib/csv.js'
+  import { buildHeatCsv, buildRunCsv, buildIntervalCsv, buildRestCsv } from '$lib/csv.js'
   import PageShell from '$lib/PageShell.svelte'
 
   let { data } = $props()
@@ -17,6 +17,7 @@
     let csv
     if (entry.type === 'heat') csv = buildHeatCsv(entry)
     else if (entry.type === 'interval') csv = buildIntervalCsv(entry)
+    else if (entry.type === 'rest') csv = buildRestCsv(entry)
     else csv = buildRunCsv(entry)
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -63,7 +64,7 @@
 </script>
 
 <PageShell
-  title={entry ? `${entry.type === 'heat' ? 'Heat' : entry.type === 'interval' ? 'Interval' : 'Run'} ${entry.number}` : 'Entry'}
+  title={entry ? `${entry.type === 'heat' ? 'Heat' : entry.type === 'interval' ? 'Interval' : entry.type === 'rest' ? 'Rest' : 'Run'} ${entry.number}` : 'Entry'}
   backHref="/history"
   backLabel="Back to history"
 >
@@ -147,6 +148,46 @@
                   </tfoot>
                 </table>
               </div>
+            {:else}
+              <p class="no-reps">No reps recorded</p>
+            {/if}
+          </div>
+        {/each}
+      </div>
+
+    {:else if entry.type === 'rest'}
+      <div class="rest-session">
+        {#each entry.participants as p (p.id)}
+          {@const reps = entry.results?.[p.id]?.reps ?? []}
+          {@const avg = reps.length > 0 ? reps.reduce((s, r) => s + r.elapsed, 0) / reps.length : null}
+          <div class="rest-card">
+            <div class="rest-card-header">
+              <span class="rest-name">{p.name}</span>
+              <span class="rest-rep-count">{reps.length}{entry.repCount ? ` / ${entry.repCount}` : ''} rep{reps.length !== 1 ? 's' : ''}</span>
+            </div>
+            {#if reps.length > 0}
+              <table>
+                <thead>
+                  <tr>
+                    <th class="col-rep">Rep</th>
+                    <th>Time</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {#each reps as rep (rep.number)}
+                    <tr>
+                      <td class="col-rep">{rep.number}</td>
+                      <td>{formatElapsed(rep.elapsed)}</td>
+                    </tr>
+                  {/each}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td class="col-rep footer-label">Avg</td>
+                    <td class="footer-val">{avg != null ? formatElapsed(avg) : '—'}</td>
+                  </tr>
+                </tfoot>
+              </table>
             {:else}
               <p class="no-reps">No reps recorded</p>
             {/if}
@@ -320,6 +361,39 @@
     padding: 10px 14px;
     font-size: 13px;
     color: var(--text-muted);
+  }
+
+  /* Rest session */
+  .rest-session {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .rest-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  .rest-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .rest-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .rest-rep-count {
+    font-size: 13px;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
   }
 
   /* Run cards */

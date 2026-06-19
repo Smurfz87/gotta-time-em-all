@@ -84,6 +84,7 @@
   function entryTitle(entry) {
     if (entry.type === 'heat') return `Heat ${entry.number}`
     if (entry.type === 'interval') return `Interval ${entry.number}`
+    if (entry.type === 'rest') return `Rest ${entry.number}`
     return `Run ${entry.number}`
   }
 
@@ -96,6 +97,11 @@
       const groups = (entry.paceGroups ?? []).length
       const reps = entry.repCount ?? '∞'
       return `${groups} group${groups !== 1 ? 's' : ''} · ${reps} reps`
+    }
+    if (entry.type === 'rest') {
+      const s = Math.round((entry.restDuration ?? 30000) / 1000)
+      const dur = s < 60 ? `${s}s` : `${Math.floor(s / 60)}m${s % 60 ? ` ${s % 60}s` : ''}`
+      return entry.repCount ? `${dur} rest · ${entry.repCount} reps` : `${dur} rest`
     }
     return null
   }
@@ -144,8 +150,8 @@
               {#if entrySub(entry)}<span class="entry-sub">{entrySub(entry)}</span>{/if}
             </div>
             <span class="entry-time">{formatDateTime(entry.timestamp)}</span>
-            <span class="entry-badge" class:heat={entry.type === 'heat'} class:run={entry.type === 'run'} class:interval={entry.type === 'interval'}>
-              {entry.type === 'heat' ? 'Heat' : entry.type === 'interval' ? 'Interval' : 'Run'}
+            <span class="entry-badge" class:heat={entry.type === 'heat'} class:run={entry.type === 'run'} class:interval={entry.type === 'interval'} class:rest={entry.type === 'rest'}>
+              {entry.type === 'heat' ? 'Heat' : entry.type === 'interval' ? 'Interval' : entry.type === 'rest' ? 'Rest' : 'Run'}
             </span>
             <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="9 18 15 12 9 6"/>
@@ -277,6 +283,11 @@
   .entry-badge.interval {
     background: color-mix(in srgb, var(--warning) 15%, transparent);
     color: var(--warning);
+  }
+
+  .entry-badge.rest {
+    background: color-mix(in srgb, #8b5cf6 15%, transparent);
+    color: #8b5cf6;
   }
 
   .chevron {

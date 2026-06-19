@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildHeatCsv, buildRunCsv, buildIntervalCsv } from './csv.js'
+import { buildHeatCsv, buildRunCsv, buildIntervalCsv, buildRestCsv } from './csv.js'
 
 const alice = { id: 'a', name: 'Alice' }
 const bob   = { id: 'b', name: 'Bob' }
@@ -201,5 +201,46 @@ describe('buildIntervalCsv', () => {
     }
     const lines = buildIntervalCsv(entry).split('\n')
     expect(lines).toHaveLength(1) // header only
+  })
+})
+
+describe('buildRestCsv', () => {
+  it('produces correct header', () => {
+    const entry = { participants: [], results: {} }
+    expect(buildRestCsv(entry)).toBe('Participant,Rep,Time')
+  })
+
+  it('produces one row per rep per participant', () => {
+    const entry = {
+      participants: [alice, bob],
+      results: {
+        a: { reps: [{ number: 1, elapsed: 5000 }, { number: 2, elapsed: 5200 }] },
+        b: { reps: [{ number: 1, elapsed: 5100 }] }
+      }
+    }
+    const lines = buildRestCsv(entry).split('\n')
+    expect(lines).toHaveLength(4) // header + 2 alice + 1 bob
+    expect(lines[1]).toBe('Alice,1,00:05.00')
+    expect(lines[2]).toBe('Alice,2,00:05.20')
+    expect(lines[3]).toBe('Bob,1,00:05.10')
+  })
+
+  it('skips participants with no result', () => {
+    const entry = {
+      participants: [alice, bob],
+      results: {
+        a: { reps: [{ number: 1, elapsed: 5000 }] }
+      }
+    }
+    const lines = buildRestCsv(entry).split('\n')
+    expect(lines.every(l => !l.startsWith('Bob'))).toBe(true)
+  })
+
+  it('handles participant with empty reps array', () => {
+    const entry = {
+      participants: [alice],
+      results: { a: { reps: [] } }
+    }
+    expect(buildRestCsv(entry)).toBe('Participant,Rep,Time')
   })
 })

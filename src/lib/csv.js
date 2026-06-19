@@ -48,6 +48,17 @@ export function buildIntervalCsv(entry) {
   return lines.join('\n')
 }
 
+export function buildRestCsv(entry) {
+  const lines = ['Participant,Rep,Time']
+  for (const p of entry.participants ?? []) {
+    const reps = entry.results?.[p.id]?.reps ?? []
+    for (const rep of reps) {
+      lines.push(`${p.name},${rep.number},${formatElapsed(rep.elapsed)}`)
+    }
+  }
+  return lines.join('\n')
+}
+
 export function buildRunCsv(entry) {
   const lines = ['Participant,Lap,Gap,Cumulative']
   for (const p of entry.participants ?? []) {
