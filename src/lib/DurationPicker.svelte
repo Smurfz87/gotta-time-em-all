@@ -51,6 +51,53 @@
     editText = formatDuration((m * 60 + s) * 1000)
   }
 
+  // Pointer-drag action for mouse/stylus — touch scroll handled natively
+  function drumDrag(node) {
+    let dragging = false
+    let startY = 0
+    let startScroll = 0
+
+    function onPointerDown(e) {
+      if (e.pointerType === 'touch') return
+      if (e.button !== 0) return
+      dragging = true
+      startY = e.clientY
+      startScroll = node.scrollTop
+      node.setPointerCapture(e.pointerId)
+      node.style.cursor = 'grabbing'
+      e.preventDefault()
+    }
+
+    function onPointerMove(e) {
+      if (!dragging) return
+      node.scrollTop = startScroll + (startY - e.clientY)
+    }
+
+    function onPointerUp(e) {
+      if (!dragging) return
+      dragging = false
+      node.releasePointerCapture(e.pointerId)
+      node.style.cursor = ''
+      // Snap to nearest item
+      const target = Math.round(node.scrollTop / ITEM_H) * ITEM_H
+      node.scrollTo({ top: target, behavior: 'smooth' })
+    }
+
+    node.addEventListener('pointerdown', onPointerDown)
+    node.addEventListener('pointermove', onPointerMove)
+    node.addEventListener('pointerup', onPointerUp)
+    node.addEventListener('pointercancel', onPointerUp)
+
+    return {
+      destroy() {
+        node.removeEventListener('pointerdown', onPointerDown)
+        node.removeEventListener('pointermove', onPointerMove)
+        node.removeEventListener('pointerup', onPointerUp)
+        node.removeEventListener('pointercancel', onPointerUp)
+      }
+    }
+  }
+
   function confirmPicker() {
     const m = Math.round((minEl?.scrollTop ?? 0) / ITEM_H)
     const s = Math.round((secEl?.scrollTop ?? 0) / ITEM_H)
@@ -90,7 +137,7 @@
       <div class="picker-body">
         <div class="selector-bar"></div>
         <div class="col-wrap">
-          <div class="drum-col" bind:this={minEl} onscroll={onDrumScroll}>
+          <div class="drum-col" bind:this={minEl} onscroll={onDrumScroll} use:drumDrag>
             <div class="pad"></div>
             {#each Array.from({length: 100}, (_, i) => i) as m}
               <div class="drum-item">{m}</div>
@@ -100,7 +147,7 @@
         </div>
         <span class="sep">:</span>
         <div class="col-wrap">
-          <div class="drum-col" bind:this={secEl} onscroll={onDrumScroll}>
+          <div class="drum-col" bind:this={secEl} onscroll={onDrumScroll} use:drumDrag>
             <div class="pad"></div>
             {#each Array.from({length: 60}, (_, i) => i) as s}
               <div class="drum-item">{String(s).padStart(2, '0')}</div>
@@ -255,6 +302,7 @@
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
     scrollbar-width: none;
+    cursor: grab;
   }
 
   .drum-col::-webkit-scrollbar { display: none; }
