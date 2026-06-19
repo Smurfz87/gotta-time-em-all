@@ -3,20 +3,15 @@
 
   let { value = $bindable(), min = 5000 } = $props()
 
-  const ITEM_H = 44  // px per drum item
+  const ITEM_H = 44
 
   let isOpen = $state(false)
   let isEditing = $state(false)
-  let coarse = $state(false)
   let minEl = $state(null)
   let secEl = $state(null)
   let editText = $state('')
 
-  $effect(() => {
-    coarse = window.matchMedia('(pointer: coarse)').matches
-  })
-
-  // Scroll columns to current value whenever picker opens or refs bind
+  // Scroll columns to match current value whenever picker opens and refs bind
   $effect(() => {
     if (!isOpen || !minEl || !secEl) return
     const m = Math.floor(value / 60000)
@@ -25,13 +20,13 @@
     secEl.scrollTop = s * ITEM_H
   })
 
-  function handleClick() {
-    if (coarse) {
-      isOpen = true
-    } else {
-      editText = formatDuration(value)
-      isEditing = true
-    }
+  function openDrum() {
+    isOpen = true
+  }
+
+  function openText() {
+    editText = formatDuration(value)
+    isEditing = true
   }
 
   function confirmPicker() {
@@ -59,19 +54,27 @@
   }
 </script>
 
-{#if isEditing}
-  <input
-    class="display-btn"
-    bind:value={editText}
-    onblur={commitEdit}
-    onkeydown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
-    use:focusAndSelect
-  />
-{:else}
-  <button class="display-btn" type="button" onclick={handleClick}>
-    {formatDuration(value)}
-  </button>
-{/if}
+<div class="dp-root">
+  {#if isEditing}
+    <input
+      class="display-btn"
+      bind:value={editText}
+      onblur={commitEdit}
+      onkeydown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+      use:focusAndSelect
+    />
+  {:else}
+    <button class="display-btn" type="button" onclick={openDrum}>
+      {formatDuration(value)}
+    </button>
+    <button class="edit-btn" type="button" onclick={openText} aria-label="Type value manually">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+      </svg>
+    </button>
+  {/if}
+</div>
 
 {#if isOpen}
   <div
@@ -114,6 +117,12 @@
 {/if}
 
 <style>
+  .dp-root {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
   .display-btn {
     min-width: 52px;
     background: var(--surface-raised);
@@ -134,6 +143,27 @@
   .display-btn:focus {
     outline: 2px solid var(--accent);
     outline-offset: 1px;
+  }
+
+  .edit-btn {
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    color: var(--text-muted);
+    opacity: 0.45;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: opacity 0.15s, background 0.15s;
+  }
+
+  .edit-btn:hover {
+    opacity: 1;
+    background: var(--surface-raised);
   }
 
   /* Bottom-sheet backdrop */
@@ -182,11 +212,10 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 220px; /* 5 × ITEM_H */
+    height: 220px;
     padding: 0 40px;
   }
 
-  /* Highlight bar behind centre row */
   .selector-bar {
     position: absolute;
     left: 20px;
@@ -208,14 +237,13 @@
     z-index: 1;
   }
 
-  /* Fade masks */
   .col-wrap::before,
   .col-wrap::after {
     content: '';
     position: absolute;
     left: 0;
     right: 0;
-    height: 88px; /* 2 × ITEM_H */
+    height: 88px;
     pointer-events: none;
     z-index: 2;
   }
@@ -241,8 +269,7 @@
 
   .drum-col::-webkit-scrollbar { display: none; }
 
-  /* Top + bottom padding so item 0 / last item can centre */
-  .pad { height: 88px; } /* 2 × ITEM_H */
+  .pad { height: 88px; }
 
   .drum-item {
     height: 44px;
