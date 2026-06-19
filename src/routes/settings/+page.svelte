@@ -161,6 +161,28 @@
       </button>
     </div>
 
+    <div class="section">
+      <div class="section-title">Rest mode</div>
+      <label class="setting-row">
+        <div class="setting-label">
+          <span class="setting-title">Sync window</span>
+          <span class="setting-desc">Taps within this window share the same rest timer</span>
+        </div>
+        <div class="sync-input-wrap">
+          <input
+            class="sync-input"
+            type="number"
+            min="1"
+            max="10"
+            value={Math.round((settings.syncWindow ?? 3000) / 1000)}
+            oninput={(e) => { settings.syncWindow = Math.max(1, parseInt(e.target.value) || 3) * 1000 }}
+            aria-label="Sync window in seconds"
+          />
+          <span class="sync-unit">s</span>
+        </div>
+      </label>
+    </div>
+
     {#if canVibrate}
       <div class="section">
         <div class="section-title">Feedback</div>
@@ -313,6 +335,37 @@
   .row-icon {
     color: var(--text-muted);
     flex-shrink: 0;
+  }
+
+  .sync-input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .sync-input {
+    width: 52px;
+    background: var(--surface-raised);
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+    text-align: center;
+    padding: 6px 8px;
+    outline: none;
+  }
+
+  .sync-input:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
+  .sync-unit {
+    font-size: 13px;
+    color: var(--text-muted);
   }
 
   /* Toggle switch */

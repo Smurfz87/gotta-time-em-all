@@ -1,5 +1,5 @@
 import { untrack } from 'svelte'
-import { readSession, writeSession } from './storage.js'
+import { readSession, writeSession, readSettings } from './storage.js'
 import { getInitials } from './utils.js'
 import {
   defaultSession,
@@ -24,6 +24,7 @@ export function createSession() {
   let intervalParticipants = $state({})
   let restParticipants = $state({})
   let intervalSessionStart = $state(null)
+  let batchAnchor = $state(null)
   let now = $state(Date.now())
 
   // Restore in-progress session on page reload — timestamps are wall-clock epoch
@@ -151,6 +152,7 @@ export function createSession() {
     intervalParticipants = {}
     restParticipants = {}
     intervalSessionStart = null
+    batchAnchor = null
     if (session.mode === 'lap') session.lapState = null
     if (session.mode === 'interval') session.intervalState = null
     if (session.mode === 'rest') session.restState = null
@@ -217,7 +219,10 @@ export function createSession() {
   }
 
   function recordRestRep(id) {
-    applyRecordRestRep(id, restParticipants, session.restConfig, heatPhase, Date.now())
+    const t = Date.now()
+    const syncWindowMs = readSettings().syncWindow ?? 3000
+    if (batchAnchor === null || t > batchAnchor + syncWindowMs) batchAnchor = t
+    applyRecordRestRep(id, restParticipants, session.restConfig, heatPhase, batchAnchor)
   }
 
   function pauseAll() {
