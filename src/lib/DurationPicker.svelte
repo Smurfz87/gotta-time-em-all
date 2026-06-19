@@ -58,9 +58,7 @@
     isOpen = false
   }
 
-  function focusAll(node) {
-    node.select()
-  }
+
 </script>
 
 <button class="display-btn" type="button" onclick={open}>
@@ -84,7 +82,6 @@
           bind:value={editText}
           oninput={onTextInput}
           onkeydown={(e) => { if (e.key === 'Enter') confirmPicker() }}
-          use:focusAll
           aria-label="Duration (m:ss)"
           inputmode="decimal"
         />
