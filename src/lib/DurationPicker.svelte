@@ -6,27 +6,49 @@
   const ITEM_H = 44
 
   let isOpen = $state(false)
-  let isEditing = $state(false)
   let minEl = $state(null)
   let secEl = $state(null)
   let editText = $state('')
+  let syncing = false  // prevents scroll ↔ text update cycles
 
-  // Scroll columns to match current value whenever picker opens and refs bind
   $effect(() => {
     if (!isOpen || !minEl || !secEl) return
     const m = Math.floor(value / 60000)
     const s = Math.floor((value % 60000) / 1000)
+    editText = formatDuration(value)
     minEl.scrollTop = m * ITEM_H
     secEl.scrollTop = s * ITEM_H
   })
 
-  function openDrum() {
+  function open() {
     isOpen = true
   }
 
-  function openText() {
-    editText = formatDuration(value)
-    isEditing = true
+  // Text input → parse → sync drum columns
+  function onTextInput(e) {
+    const raw = e.target.value
+    const parts = raw.trim().split(':')
+    let m, s
+    if (parts.length === 2) {
+      m = Math.max(0, Math.min(99, parseInt(parts[0]) || 0))
+      s = Math.max(0, Math.min(59, parseInt(parts[1]) || 0))
+    } else {
+      const total = parseInt(raw) || 0
+      m = Math.min(99, Math.floor(total / 60))
+      s = total % 60
+    }
+    syncing = true
+    if (minEl) minEl.scrollTop = m * ITEM_H
+    if (secEl) secEl.scrollTop = s * ITEM_H
+    setTimeout(() => { syncing = false }, 150)
+  }
+
+  // Drum scroll → update text input
+  function onDrumScroll() {
+    if (syncing) return
+    const m = Math.round((minEl?.scrollTop ?? 0) / ITEM_H)
+    const s = Math.round((secEl?.scrollTop ?? 0) / ITEM_H)
+    editText = formatDuration((m * 60 + s) * 1000)
   }
 
   function confirmPicker() {
@@ -36,45 +58,14 @@
     isOpen = false
   }
 
-  function commitEdit() {
-    const parts = editText.trim().split(':')
-    let ms
-    if (parts.length === 2) {
-      ms = ((parseInt(parts[0]) || 0) * 60 + Math.min(59, parseInt(parts[1]) || 0)) * 1000
-    } else {
-      ms = (parseInt(editText) || 0) * 1000
-    }
-    value = Math.max(min, ms)
-    isEditing = false
-  }
-
-  function focusAndSelect(node) {
-    node.focus()
+  function focusAll(node) {
     node.select()
   }
 </script>
 
-<div class="dp-root">
-  {#if isEditing}
-    <input
-      class="display-btn"
-      bind:value={editText}
-      onblur={commitEdit}
-      onkeydown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
-      use:focusAndSelect
-    />
-  {:else}
-    <button class="display-btn" type="button" onclick={openDrum}>
-      {formatDuration(value)}
-    </button>
-    <button class="edit-btn" type="button" onclick={openText} aria-label="Type value manually">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-      </svg>
-    </button>
-  {/if}
-</div>
+<button class="display-btn" type="button" onclick={open}>
+  {formatDuration(value)}
+</button>
 
 {#if isOpen}
   <div
@@ -88,12 +79,21 @@
     <div class="sheet" onclick={(e) => e.stopPropagation()}>
       <div class="sheet-header">
         <button type="button" class="hdr-btn" onclick={() => (isOpen = false)}>Cancel</button>
+        <input
+          class="text-input"
+          bind:value={editText}
+          oninput={onTextInput}
+          onkeydown={(e) => { if (e.key === 'Enter') confirmPicker() }}
+          use:focusAll
+          aria-label="Duration (m:ss)"
+          inputmode="decimal"
+        />
         <button type="button" class="hdr-btn hdr-btn--done" onclick={confirmPicker}>Done</button>
       </div>
       <div class="picker-body">
         <div class="selector-bar"></div>
         <div class="col-wrap">
-          <div class="drum-col" bind:this={minEl}>
+          <div class="drum-col" bind:this={minEl} onscroll={onDrumScroll}>
             <div class="pad"></div>
             {#each Array.from({length: 100}, (_, i) => i) as m}
               <div class="drum-item">{m}</div>
@@ -103,7 +103,7 @@
         </div>
         <span class="sep">:</span>
         <div class="col-wrap">
-          <div class="drum-col" bind:this={secEl}>
+          <div class="drum-col" bind:this={secEl} onscroll={onDrumScroll}>
             <div class="pad"></div>
             {#each Array.from({length: 60}, (_, i) => i) as s}
               <div class="drum-item">{String(s).padStart(2, '0')}</div>
@@ -117,12 +117,6 @@
 {/if}
 
 <style>
-  .dp-root {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-  }
-
   .display-btn {
     min-width: 52px;
     background: var(--surface-raised);
@@ -137,33 +131,11 @@
     height: 30px;
     cursor: pointer;
     outline: none;
-    box-sizing: border-box;
   }
 
   .display-btn:focus {
     outline: 2px solid var(--accent);
     outline-offset: 1px;
-  }
-
-  .edit-btn {
-    width: 22px;
-    height: 22px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: transparent;
-    border: none;
-    border-radius: 4px;
-    color: var(--text-muted);
-    opacity: 0.45;
-    cursor: pointer;
-    flex-shrink: 0;
-    transition: opacity 0.15s, background 0.15s;
-  }
-
-  .edit-btn:hover {
-    opacity: 1;
-    background: var(--surface-raised);
   }
 
   /* Bottom-sheet backdrop */
@@ -187,23 +159,44 @@
 
   .sheet-header {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    padding: 14px 20px;
+    gap: 8px;
+    padding: 12px 16px;
     border-bottom: 1px solid var(--border);
   }
 
   .hdr-btn {
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 500;
     color: var(--text-muted);
     background: transparent;
-    padding: 4px 8px;
+    padding: 4px 6px;
+    flex-shrink: 0;
   }
 
   .hdr-btn--done {
     color: var(--accent);
     font-weight: 600;
+  }
+
+  .text-input {
+    flex: 1;
+    background: var(--surface-raised);
+    border: none;
+    border-radius: 8px;
+    font-size: 20px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+    text-align: center;
+    padding: 6px 12px;
+    outline: none;
+    min-width: 0;
+  }
+
+  .text-input:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
   }
 
   /* Drum picker */
