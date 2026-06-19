@@ -146,7 +146,6 @@
         id="rep-count"
         class="config-input short"
         type="number"
-        min="1"
         placeholder="∞"
         value={intervalConfig.repCount ?? ''}
         oninput={handleRepCountInput}
