@@ -1,24 +1,9 @@
 <script>
   import AddParticipant from './AddParticipant.svelte'
-  import { formatDuration } from './time.js'
+  import DurationPicker from './DurationPicker.svelte'
   import { avatarColor } from './utils.js'
 
   let { restConfig, participants, addParticipant, removeParticipant } = $props()
-
-  function parseDuration(str) {
-    const parts = str.trim().split(':')
-    if (parts.length === 2) {
-      const m = parseInt(parts[0]) || 0
-      const s = Math.min(59, parseInt(parts[1]) || 0)
-      return Math.max(5000, (m * 60 + s) * 1000)
-    }
-    return Math.max(5000, (parseInt(str) || 0) * 1000)
-  }
-
-  function handleDurationBlur(e) {
-    restConfig.restDuration = parseDuration(e.target.value)
-    e.target.value = formatDuration(restConfig.restDuration)
-  }
 
   function handleRepCountInput(e) {
     const n = parseInt(e.target.value)
@@ -31,15 +16,8 @@
 <div class="setup">
   <div class="config-section">
     <div class="config-row">
-      <label class="config-label" for="rest-duration">Rest duration</label>
-      <input
-        id="rest-duration"
-        class="duration-input"
-        value={formatDuration(restConfig.restDuration ?? 30000)}
-        onblur={handleDurationBlur}
-        aria-label="Rest duration (mm:ss)"
-        title="Rest duration in mm:ss"
-      />
+      <span class="config-label">Rest duration</span>
+      <DurationPicker bind:value={restConfig.restDuration} min={5000} />
     </div>
     <div class="config-row">
       <label class="config-label" for="rep-count">Reps</label>
@@ -103,25 +81,6 @@
     font-weight: 600;
     color: var(--text);
     flex: 1;
-  }
-
-  .duration-input {
-    width: 64px;
-    background: var(--surface-raised);
-    border: none;
-    border-radius: 6px;
-    font-size: 14px;
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-    color: var(--text);
-    text-align: center;
-    padding: 6px 8px;
-    outline: none;
-  }
-
-  .duration-input:focus {
-    outline: 2px solid var(--accent);
-    outline-offset: 1px;
   }
 
   .config-input {

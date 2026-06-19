@@ -1,6 +1,6 @@
 <script>
   import AddParticipant from './AddParticipant.svelte'
-  import { formatDuration } from './time.js'
+  import DurationPicker from './DurationPicker.svelte'
 
   let { intervalConfig, participants, addParticipant } = $props()
 
@@ -15,12 +15,6 @@
   let participantMap = $derived(
     Object.fromEntries(participants.map(p => [p.id, p]))
   )
-
-  let bufferSeconds = $state(Math.round((intervalConfig.overflowBuffer ?? 30000) / 1000))
-
-  $effect(() => {
-    intervalConfig.overflowBuffer = Math.max(1, bufferSeconds || 30) * 1000
-  })
 
   function addGroup() {
     intervalConfig.paceGroups.push({
@@ -53,21 +47,6 @@
     group.participantIds = group.participantIds.filter(id => id !== participantId)
   }
 
-  function parseSendOff(str) {
-    const parts = str.trim().split(':')
-    if (parts.length === 2) {
-      const m = parseInt(parts[0]) || 0
-      const s = Math.min(59, parseInt(parts[1]) || 0)
-      return Math.max(5000, (m * 60 + s) * 1000)
-    }
-    return Math.max(5000, (parseInt(str) || 0) * 1000)
-  }
-
-  function handleSendOffBlur(group, e) {
-    group.sendOff = parseSendOff(e.target.value)
-    e.target.value = formatDuration(group.sendOff)
-  }
-
   function handleRepCountInput(e) {
     const n = parseInt(e.target.value)
     intervalConfig.repCount = n > 0 ? n : null
@@ -95,13 +74,7 @@
           oninput={(e) => { group.name = e.target.value }}
           aria-label="Group name"
         />
-        <input
-          class="sendoff-input"
-          value={formatDuration(group.sendOff)}
-          onblur={(e) => handleSendOffBlur(group, e)}
-          aria-label="Send-off (mm:ss)"
-          title="Send-off time in mm:ss"
-        />
+        <DurationPicker bind:value={group.sendOff} min={5000} />
         <button class="delete-group-btn" onclick={() => deleteGroup(group.id)} aria-label="Delete {group.name}">×</button>
       </div>
 
@@ -166,8 +139,7 @@
         <input type="radio" bind:group={intervalConfig.overflowBehavior} value="reset+buffer" />
         Reset + buffer
         {#if intervalConfig.overflowBehavior === 'reset+buffer'}
-          <input class="config-input short" type="number" min="1" bind:value={bufferSeconds} />
-          <span>s</span>
+          <DurationPicker bind:value={intervalConfig.overflowBuffer} min={1000} />
         {/if}
       </label>
     </div>
@@ -240,25 +212,6 @@
 
   .group-name-input:focus {
     color: var(--accent);
-  }
-
-  .sendoff-input {
-    width: 52px;
-    background: var(--surface-raised);
-    border-radius: 4px;
-    border: none;
-    font-size: 13px;
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-    color: var(--text);
-    text-align: center;
-    padding: 3px 4px;
-    outline: none;
-  }
-
-  .sendoff-input:focus {
-    outline: 2px solid var(--accent);
-    outline-offset: 1px;
   }
 
   .delete-group-btn {
