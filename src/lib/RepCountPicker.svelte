@@ -1,69 +1,70 @@
 <script>
-  import { formatDuration } from './time.js'
   import { drumDrag } from './drumDrag.js'
 
-  let { value = $bindable(), min = 5000 } = $props()
+  let { value = $bindable() } = $props()
+  // value: null (∞, unlimited) or integer 1–100
 
   const ITEM_H = 44
+  const MAX = 100
 
   let isOpen = $state(false)
-  let minEl = $state(null)
-  let secEl = $state(null)
+  let colEl = $state(null)
   let editText = $state('')
-  let syncing = false  // prevents scroll ↔ text update cycles
+  let syncing = false
+
+  function posFromValue(v) {
+    return v == null ? 0 : Math.max(1, Math.min(MAX, v))
+  }
+
+  function valueFromPos(pos) {
+    return pos === 0 ? null : Math.max(1, Math.min(MAX, Math.round(pos)))
+  }
+
+  function displayText(v) {
+    return v == null ? '∞' : String(v)
+  }
 
   $effect(() => {
-    if (!isOpen || !minEl || !secEl) return
-    const m = Math.floor(value / 60000)
-    const s = Math.floor((value % 60000) / 1000)
-    editText = formatDuration(value)
-    minEl.scrollTop = m * ITEM_H
-    secEl.scrollTop = s * ITEM_H
+    if (!isOpen || !colEl) return
+    editText = displayText(value)
+    colEl.scrollTop = posFromValue(value) * ITEM_H
   })
 
   function open() {
     isOpen = true
   }
 
-  // Text input → parse → sync drum columns
+  // Text input → sync drum column
   function onTextInput(e) {
-    const raw = e.target.value
-    const parts = raw.trim().split(':')
-    let m, s
-    if (parts.length === 2) {
-      m = Math.max(0, Math.min(99, parseInt(parts[0]) || 0))
-      s = Math.max(0, Math.min(59, parseInt(parts[1]) || 0))
+    const raw = e.target.value.trim()
+    let pos
+    if (raw === '∞' || raw === '' || raw.toLowerCase() === 'inf') {
+      pos = 0
     } else {
-      const total = parseInt(raw) || 0
-      m = Math.min(99, Math.floor(total / 60))
-      s = total % 60
+      const n = parseInt(raw) || 0
+      pos = n > 0 ? Math.min(MAX, n) : 0
     }
     syncing = true
-    if (minEl) minEl.scrollTop = m * ITEM_H
-    if (secEl) secEl.scrollTop = s * ITEM_H
+    if (colEl) colEl.scrollTop = pos * ITEM_H
     setTimeout(() => { syncing = false }, 150)
   }
 
   // Drum scroll → update text input
-  function onDrumScroll() {
+  function onColScroll() {
     if (syncing) return
-    const m = Math.round((minEl?.scrollTop ?? 0) / ITEM_H)
-    const s = Math.round((secEl?.scrollTop ?? 0) / ITEM_H)
-    editText = formatDuration((m * 60 + s) * 1000)
+    const pos = Math.round((colEl?.scrollTop ?? 0) / ITEM_H)
+    editText = pos === 0 ? '∞' : String(pos)
   }
 
   function confirmPicker() {
-    const m = Math.round((minEl?.scrollTop ?? 0) / ITEM_H)
-    const s = Math.round((secEl?.scrollTop ?? 0) / ITEM_H)
-    value = Math.max(min, (m * 60 + s) * 1000)
+    const pos = Math.round((colEl?.scrollTop ?? 0) / ITEM_H)
+    value = valueFromPos(pos)
     isOpen = false
   }
-
-
 </script>
 
 <button class="display-btn" type="button" onclick={open}>
-  {formatDuration(value)}
+  {displayText(value)}
 </button>
 
 {#if isOpen}
@@ -71,7 +72,7 @@
     class="backdrop"
     role="dialog"
     aria-modal="true"
-    aria-label="Set duration"
+    aria-label="Set rep count"
     onclick={(e) => { if (e.target === e.currentTarget) confirmPicker() }}
     onkeydown={(e) => { if (e.key === 'Escape') isOpen = false }}
   >
@@ -83,28 +84,19 @@
           bind:value={editText}
           oninput={onTextInput}
           onkeydown={(e) => { if (e.key === 'Enter') confirmPicker() }}
-          aria-label="Duration (m:ss)"
-          inputmode="decimal"
+          aria-label="Rep count (∞ for unlimited)"
+          inputmode="numeric"
         />
         <button type="button" class="hdr-btn hdr-btn--done" onclick={confirmPicker}>Done</button>
       </div>
       <div class="picker-body">
         <div class="selector-bar"></div>
         <div class="col-wrap">
-          <div class="drum-col" bind:this={minEl} onscroll={onDrumScroll} use:drumDrag>
+          <div class="drum-col" bind:this={colEl} onscroll={onColScroll} use:drumDrag>
             <div class="pad"></div>
-            {#each Array.from({length: 100}, (_, i) => i) as m}
-              <div class="drum-item">{m}</div>
-            {/each}
-            <div class="pad"></div>
-          </div>
-        </div>
-        <span class="sep">:</span>
-        <div class="col-wrap">
-          <div class="drum-col" bind:this={secEl} onscroll={onDrumScroll} use:drumDrag>
-            <div class="pad"></div>
-            {#each Array.from({length: 60}, (_, i) => i) as s}
-              <div class="drum-item">{String(s).padStart(2, '0')}</div>
+            <div class="drum-item">∞</div>
+            {#each Array.from({length: MAX}, (_, i) => i + 1) as n}
+              <div class="drum-item">{n}</div>
             {/each}
             <div class="pad"></div>
           </div>
@@ -136,7 +128,6 @@
     outline-offset: 1px;
   }
 
-  /* Bottom-sheet backdrop */
   .backdrop {
     position: fixed;
     inset: 0;
@@ -197,7 +188,6 @@
     outline-offset: 1px;
   }
 
-  /* Drum picker */
   .picker-body {
     position: relative;
     display: flex;
@@ -223,8 +213,7 @@
   .col-wrap {
     position: relative;
     height: 220px;
-    flex: 1;
-    max-width: 120px;
+    width: 160px;
     z-index: 1;
   }
 
@@ -274,14 +263,5 @@
     color: var(--text);
     scroll-snap-align: center;
     user-select: none;
-  }
-
-  .sep {
-    font-size: 28px;
-    font-weight: 600;
-    color: var(--text);
-    padding: 0 8px;
-    flex-shrink: 0;
-    z-index: 1;
   }
 </style>

@@ -1,14 +1,10 @@
 <script>
   import AddParticipant from './AddParticipant.svelte'
   import DurationPicker from './DurationPicker.svelte'
+  import RepCountPicker from './RepCountPicker.svelte'
   import { avatarColor } from './utils.js'
 
   let { restConfig, participants, addParticipant, removeParticipant } = $props()
-
-  function handleRepCountInput(e) {
-    const n = parseInt(e.target.value)
-    restConfig.repCount = n > 0 ? n : null
-  }
 </script>
 
 <AddParticipant {addParticipant} />
@@ -20,16 +16,8 @@
       <DurationPicker bind:value={restConfig.restDuration} min={5000} />
     </div>
     <div class="config-row">
-      <label class="config-label" for="rep-count">Reps</label>
-      <input
-        id="rep-count"
-        class="config-input short"
-        type="number"
-        placeholder="∞"
-        value={restConfig.repCount ?? ''}
-        oninput={handleRepCountInput}
-        aria-label="Rep count (blank for unlimited)"
-      />
+      <span class="config-label">Reps</span>
+      <RepCountPicker bind:value={restConfig.repCount} />
     </div>
   </div>
 

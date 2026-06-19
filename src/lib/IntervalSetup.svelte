@@ -1,6 +1,7 @@
 <script>
   import AddParticipant from './AddParticipant.svelte'
   import DurationPicker from './DurationPicker.svelte'
+  import RepCountPicker from './RepCountPicker.svelte'
 
   let { intervalConfig, participants, addParticipant } = $props()
 
@@ -47,10 +48,6 @@
     group.participantIds = group.participantIds.filter(id => id !== participantId)
   }
 
-  function handleRepCountInput(e) {
-    const n = parseInt(e.target.value)
-    intervalConfig.repCount = n > 0 ? n : null
-  }
 </script>
 
 <AddParticipant {addParticipant} />
@@ -114,15 +111,8 @@
 
   <div class="config-section">
     <div class="config-row">
-      <label class="config-label" for="rep-count">Reps</label>
-      <input
-        id="rep-count"
-        class="config-input short"
-        type="number"
-        placeholder="∞"
-        value={intervalConfig.repCount ?? ''}
-        oninput={handleRepCountInput}
-      />
+      <span class="config-label">Reps</span>
+      <RepCountPicker bind:value={intervalConfig.repCount} />
     </div>
 
     <div class="config-row column">
