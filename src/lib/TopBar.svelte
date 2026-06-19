@@ -2,30 +2,58 @@
   import { base } from '$app/paths'
 
   let { mode, onModeChange } = $props()
+
+  const MODES = [
+    {
+      id: 'heat',
+      label: 'Heat',
+      desc: 'All participants start together and stop individually when they finish. Records one time per participant per heat.'
+    },
+    {
+      id: 'lap',
+      label: 'Lap',
+      desc: 'A continuous timer runs while splits are recorded per participant at any moment. Each participant has a Lap and a Stop button.'
+    },
+    {
+      id: 'interval',
+      label: 'Interval',
+      desc: 'Participants are split into pace groups, each with a rolling countdown (send-off). Tap a participant when they finish each rep.'
+    },
+    {
+      id: 'rest',
+      label: 'Rest',
+      desc: 'All participants start together. Tap each participant when they finish a rep — a personal rest countdown begins, then their next rep starts automatically.'
+    }
+  ]
+
+  let infoMode = $state(null)
+
+  function toggleInfo(id, e) {
+    e.stopPropagation()
+    infoMode = infoMode === id ? null : id
+  }
 </script>
+
+<svelte:window onclick={() => { infoMode = null }} />
 
 <header>
   <div class="mode-toggle" role="group" aria-label="Timing mode">
-    <button
-      class="toggle-btn"
-      class:active={mode === 'heat'}
-      onclick={() => onModeChange('heat')}
-    >Heat</button>
-    <button
-      class="toggle-btn"
-      class:active={mode === 'lap'}
-      onclick={() => onModeChange('lap')}
-    >Lap</button>
-    <button
-      class="toggle-btn"
-      class:active={mode === 'interval'}
-      onclick={() => onModeChange('interval')}
-    >Interval</button>
-    <button
-      class="toggle-btn"
-      class:active={mode === 'rest'}
-      onclick={() => onModeChange('rest')}
-    >Rest</button>
+    {#each MODES as m}
+      <button
+        class="toggle-btn"
+        class:active={mode === m.id}
+        onclick={() => onModeChange(m.id)}
+      >
+        {m.label}<span
+          class="info-icon"
+          role="button"
+          tabindex="0"
+          onclick={(e) => toggleInfo(m.id, e)}
+          onkeydown={(e) => e.key === 'Enter' && toggleInfo(m.id, e)}
+          aria-label="About {m.label} mode"
+        >ⓘ</span>
+      </button>
+    {/each}
   </div>
   <div class="nav-icons">
     <a href="{base}/history" class="icon-link" aria-label="History">
@@ -41,6 +69,14 @@
       </svg>
     </a>
   </div>
+
+  {#if infoMode}
+    {@const m = MODES.find(x => x.id === infoMode)}
+    <div class="info-popover" role="tooltip" onclick={(e) => e.stopPropagation()}>
+      <span class="info-mode-label">{m.label} mode</span>
+      <p class="info-desc">{m.desc}</p>
+    </div>
+  {/if}
 </header>
 
 <style>
@@ -53,6 +89,7 @@
     background: var(--surface);
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
+    position: relative;
   }
 
   .mode-toggle {
@@ -79,6 +116,24 @@
     color: white;
   }
 
+  .info-icon {
+    font-size: 10px;
+    opacity: 0.55;
+    vertical-align: super;
+    margin-left: 2px;
+    cursor: pointer;
+    line-height: 1;
+    user-select: none;
+  }
+
+  .toggle-btn.active .info-icon {
+    opacity: 0.8;
+  }
+
+  .info-icon:hover {
+    opacity: 1;
+  }
+
   .nav-icons {
     display: flex;
     gap: 2px;
@@ -99,5 +154,33 @@
   .icon-link:hover {
     background: var(--surface-raised);
     color: var(--text);
+  }
+
+  .info-popover {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 16px;
+    right: 16px;
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    z-index: 200;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  }
+
+  .info-mode-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--accent);
+  }
+
+  .info-desc {
+    font-size: 13px;
+    color: var(--text);
+    margin-top: 4px;
+    line-height: 1.55;
   }
 </style>
