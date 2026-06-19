@@ -67,4 +67,4 @@ src/
 ## License
 
 PolyForm Noncommercial 1.0.0 — free for non-commercial use with attribution.
-Commercial use requires a separate license. See [LICENSE](LICENSE) and [NOTICE](NOTICE) for details.
+Commercial use requires a separate licence. See [LICENCE](LICENSE) and [NOTICE](NOTICE) for details.
