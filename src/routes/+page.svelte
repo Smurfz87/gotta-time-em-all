@@ -3,6 +3,7 @@
   import ParticipantList from '$lib/ParticipantList.svelte'
   import IntervalSetup from '$lib/IntervalSetup.svelte'
   import IntervalSession from '$lib/IntervalSession.svelte'
+  import RestSetup from '$lib/RestSetup.svelte'
   import RestSession from '$lib/RestSession.svelte'
   import BottomControls from '$lib/BottomControls.svelte'
   import { readSettings } from '$lib/storage.js'
@@ -35,14 +36,23 @@
           recordIntervalRep={s.recordIntervalRep}
         />
       {/if}
-    {:else if s.session.mode === 'rest' && s.heatPhase !== 'idle'}
-      <RestSession
-        participants={s.session.participants}
-        restParticipants={s.restParticipants}
-        restConfig={s.session.restConfig}
-        now={s.now}
-        recordRestRep={s.recordRestRep}
-      />
+    {:else if s.session.mode === 'rest'}
+      {#if s.heatPhase === 'idle'}
+        <RestSetup
+          restConfig={s.session.restConfig}
+          participants={s.session.participants}
+          addParticipant={s.addParticipant}
+          removeParticipant={s.removeParticipant}
+        />
+      {:else}
+        <RestSession
+          participants={s.session.participants}
+          restParticipants={s.restParticipants}
+          restConfig={s.session.restConfig}
+          now={s.now}
+          recordRestRep={s.recordRestRep}
+        />
+      {/if}
     {:else}
       <ParticipantList
         participants={s.session.participants}
